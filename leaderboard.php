@@ -46,7 +46,7 @@ $userAchievements = $db->fetchAll(
      FROM user_achievements ua
      JOIN achievements a ON ua.achievement_id = a.id
      WHERE ua.user_id = ?
-     ORDER BY ua.unlocked_at DESC
+     ORDER BY ua.earned_at DESC
      LIMIT 5",
     [$userId]
 );
