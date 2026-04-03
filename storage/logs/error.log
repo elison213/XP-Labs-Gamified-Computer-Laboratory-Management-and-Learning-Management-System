@@ -225,3 +225,12 @@ Stack trace:
 #2 C:\xampp\htdocs\xplabs\my_quizzes.php(54): XPLabs\Lib\Database->fetchAll('SELECT q.*, c.n...', Array)
 #3 {main}
   thrown in C:\xampp\htdocs\xplabs\lib\Database.php on line 58
+[03-Apr-2026 22:17:45 Asia/Manila] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'a.points_bonus' in 'field list' in C:\xampp\htdocs\xplabs\lib\Database.php:58
+Stack trace:
+#0 C:\xampp\htdocs\xplabs\lib\Database.php(58): PDO->prepare('SELECT ua.*, a....')
+#1 C:\xampp\htdocs\xplabs\lib\Database.php(77): XPLabs\Lib\Database->query('SELECT ua.*, a....', Array)
+#2 C:\xampp\htdocs\xplabs\profile_student.php(34): XPLabs\Lib\Database->fetchAll('SELECT ua.*, a....', Array)
+#3 {main}
+  thrown in C:\xampp\htdocs\xplabs\lib\Database.php on line 58
+[03-Apr-2026 22:19:36 Asia/Manila] saveFloorLayout: floorId=300, gridCols=8, gridRows=7, result=0
+[03-Apr-2026 22:19:54 Asia/Manila] saveFloorLayout: floorId=300, gridCols=5, gridRows=7, result=1

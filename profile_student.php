@@ -26,7 +26,7 @@ $user = $db->fetch(
 
 // Get user's achievements
 $achievements = $db->fetchAll(
-    "SELECT ua.*, a.name, a.icon, a.description, a.points_bonus
+    "SELECT ua.*, a.name, a.icon, a.description, a.points_reward
      FROM user_achievements ua
      JOIN achievements a ON ua.achievement_id = a.id
      WHERE ua.user_id = ?
@@ -184,7 +184,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
                         <div class="activity-item px-3">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div><div class="fw-semibold"><?= e($q['quiz_title']) ?></div><div class="text-muted small"><?= $q['finished_at'] ? date('M j, Y', strtotime($q['finished_at'])) : '' ?></div></div>
-                                <div class="text-end"><div class="fw-bold <?= $q['score_percentage'] >= 80 ? 'text-success' : ($q['score_percentage'] >= 50 ? 'text-warning' : 'text-danger') ?>"><?= number_format($q['score_percentage'], 1) ?>%</div><div class="text-muted small"><?= $q['correct_answers'] ?>/<?= $q['total_questions'] ?> correct</div></div>
+                                <div class="text-end"><div class="fw-bold"><?= $q['total_questions'] > 0 ? number_format(($q['correct_answers'] / $q['total_questions']) * 100, 1) : 0 ?>%</div><div class="text-muted small"><?= $q['correct_answers'] ?>/<?= $q['total_questions'] ?> correct</div></div>
                             </div>
                         </div>
                         <?php endforeach; ?>
