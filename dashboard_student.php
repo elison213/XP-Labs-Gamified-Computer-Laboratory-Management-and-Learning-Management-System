@@ -353,28 +353,7 @@ $leaderboardPos = $db->fetchOne(
 </head>
 <body>
     <!-- Sidebar -->
-    <nav class="sidebar">
-        <div class="sidebar-brand">
-            <h4><i class="bi bi-flask me-2"></i>XPLabs</h4>
-            <small>Student Portal</small>
-        </div>
-        <div class="sidebar-nav">
-            <a href="dashboard_student.php" class="active"><i class="bi bi-grid-1x2"></i> Dashboard</a>
-            <a href="leaderboard.php"><i class="bi bi-trophy"></i> Leaderboard</a>
-            <a href="profile_student.php"><i class="bi bi-person"></i> My Profile</a>
-            
-            <div class="nav-section">Learning</div>
-            <a href="assignments.php"><i class="bi bi-journal-text"></i> Assignments</a>
-            <a href="submissions.php"><i class="bi bi-upload"></i> My Submissions</a>
-            
-            <div class="nav-section">Lab</div>
-            <a href="lab_seatplan.php"><i class="bi bi-layout-text-window-reverse"></i> Seat Plan</a>
-            <a href="attendance_history.php"><i class="bi bi-calendar-check"></i> Attendance</a>
-            
-            <div class="nav-section mt-4">Account</div>
-            <a href="api/auth/logout.php"><i class="bi bi-box-arrow-right"></i> Logout</a>
-        </div>
-    </nav>
+    <?php include __DIR__ . '/components/student_sidebar.php'; ?>
 
     <!-- Main Content -->
     <div class="main-content">
