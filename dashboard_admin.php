@@ -60,87 +60,24 @@ $floors = $labService->getFloors();
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         :root {
-            --bg-dark: #0f172a;
-            --bg-card: #1e293b;
-            --bg-panel: #1e293b;
-            --border: #334155;
-            --text: #e2e8f0;
-            --text-muted: #94a3b8;
+            --bg-main: #f1f5f9;
+            --bg-card: #ffffff;
+            --bg-panel: #ffffff;
+            --border: #e2e8f0;
+            --text: #1e293b;
+            --text-muted: #64748b;
             --accent: #6366f1;
             --green: #22c55e;
             --yellow: #eab308;
             --red: #ef4444;
-            --gray: #64748b;
+            --gray: #94a3b8;
         }
         
         body {
-            background: var(--bg-dark);
+            background: var(--bg-main);
             color: var(--text);
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
             min-height: 100vh;
-        }
-        <?php if (($_SESSION['user_role'] ?? 'admin') === 'teacher'): ?>
-        body { background: #f1f5f9 !important; }
-        .main-content { background: #f1f5f9; }
-        .stat-card { background: #fff; border-color: #e2e8f0; }
-        .stat-card .value { color: #1e293b; }
-        .stat-card .label { color: #64748b; }
-        .xp-card { background: #fff; border-color: #e2e8f0; }
-        .xp-card .card-header { background: #fff; border-color: #e2e8f0; }
-        .xp-card .card-header h5 { color: #1e293b; }
-        .xp-table th { color: #64748b; }
-        .xp-table td { color: #1e293b; border-color: #e2e8f0; }
-        .form-control, .form-select { background: #fff; border-color: #e2e8f0; color: #1e293b; }
-        .form-label { color: #64748b; }
-        .text-muted { color: #64748b !important; }
-        .text-white { color: #1e293b !important; }
-        .modal-content { background: #fff; }
-        .modal-header { border-color: #e2e8f0; }
-        .modal-footer { border-color: #e2e8f0; }
-        .page-header h2 { color: #1e293b; }
-        .page-header p { color: #64748b; }
-        <?php endif; ?>
-
-        /* Sidebar */
-        .sidebar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 260px;
-            height: 100vh;
-            background: var(--bg-card);
-            border-right: 1px solid var(--border);
-            z-index: 1000;
-            overflow-y: auto;
-        }
-        .sidebar-brand {
-            padding: 1.5rem;
-            border-bottom: 1px solid var(--border);
-        }
-        .sidebar-brand h4 { margin: 0; font-weight: 700; color: #fff; }
-        .sidebar-brand small { color: var(--text-muted); }
-        .sidebar-nav { padding: 1rem 0; }
-        .sidebar-nav a {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            padding: 0.75rem 1.5rem;
-            color: var(--text-muted);
-            text-decoration: none;
-            transition: all 0.2s;
-        }
-        .sidebar-nav a:hover, .sidebar-nav a.active {
-            background: rgba(99, 102, 241, 0.1);
-            color: var(--accent);
-        }
-        .sidebar-nav a i { width: 20px; text-align: center; }
-        .sidebar-nav .nav-section {
-            padding: 0.5rem 1.5rem;
-            font-size: 0.7rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-muted);
-            margin-top: 0.5rem;
         }
 
         /* Main Content */
@@ -156,7 +93,7 @@ $floors = $labService->getFloors();
             align-items: center;
             margin-bottom: 2rem;
         }
-        .page-header h2 { margin: 0; font-weight: 700; color: #fff; }
+        .page-header h2 { margin: 0; font-weight: 700; color: var(--text); }
         .page-header p { margin: 0.25rem 0 0; color: var(--text-muted); }
 
         /* Stat Cards */
@@ -177,7 +114,7 @@ $floors = $labService->getFloors();
             justify-content: center;
             font-size: 1.5rem;
         }
-        .stat-card .value { font-size: 1.75rem; font-weight: 700; color: #fff; }
+        .stat-card .value { font-size: 1.75rem; font-weight: 700; color: var(--text); }
         .stat-card .label { font-size: 0.85rem; color: var(--text-muted); }
 
         /* Cards */
@@ -192,7 +129,7 @@ $floors = $labService->getFloors();
             border-bottom: 1px solid var(--border);
             padding: 1rem 1.5rem;
         }
-        .xp-card .card-header h5 { margin: 0; font-weight: 600; color: #fff; }
+        .xp-card .card-header h5 { margin: 0; font-weight: 600; color: var(--text); }
         .xp-card .card-body { padding: 1.5rem; }
 
         /* Activity List */
@@ -213,7 +150,7 @@ $floors = $labService->getFloors();
             flex-shrink: 0;
         }
         .activity-content { flex: 1; }
-        .activity-content strong { color: #fff; }
+        .activity-content strong { color: var(--text); }
         .activity-time { font-size: 0.75rem; color: var(--text-muted); }
 
         /* Leaderboard */
@@ -238,9 +175,9 @@ $floors = $labService->getFloors();
         .rank.gold { background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #000; }
         .rank.silver { background: linear-gradient(135deg, #94a3b8, #64748b); color: #fff; }
         .rank.bronze { background: linear-gradient(135deg, #d97706, #b45309); color: #fff; }
-        .rank.default { background: var(--bg-dark); color: var(--text-muted); }
+        .rank.default { background: var(--bg-card); color: var(--text-muted); }
         .student-info { flex: 1; }
-        .student-name { font-weight: 600; color: #fff; }
+        .student-name { font-weight: 600; color: var(--text); }
         .student-detail { font-size: 0.75rem; color: var(--text-muted); }
         .student-points { font-weight: 700; color: var(--accent); }
 
@@ -250,7 +187,7 @@ $floors = $labService->getFloors();
             align-items: center;
             gap: 1rem;
             padding: 1rem;
-            background: var(--bg-dark);
+            background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: 8px;
             text-decoration: none;
@@ -258,7 +195,7 @@ $floors = $labService->getFloors();
             transition: all 0.2s;
             margin-bottom: 0.75rem;
         }
-        .quick-action:hover { border-color: var(--accent); background: rgba(99, 102, 241, 0.05); color: #fff; }
+        .quick-action:hover { border-color: var(--accent); background: rgba(99, 102, 241, 0.05); color: var(--text); }
         .quick-action i { font-size: 1.25rem; color: var(--accent); }
     </style>
 </head>
@@ -352,9 +289,9 @@ $floors = $labService->getFloors();
                                 $floorStats = $labService->getStats($floor['id']);
                             ?>
                             <div class="col-md-6">
-                                <div class="p-3 rounded" style="background: var(--bg-dark); border: 1px solid var(--border);">
+                                <div class="p-3 rounded" style="background: var(--bg-card); border: 1px solid var(--border);">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <strong class="text-white"><?= e($floor['name']) ?></strong>
+                                        <strong class="text-body"><?= e($floor['name']) ?></strong>
                                         <span class="badge bg-primary"><?= $floorStats['total'] ?> stations</span>
                                     </div>
                                     <div class="d-flex gap-2 small">
