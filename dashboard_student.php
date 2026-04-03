@@ -102,6 +102,42 @@ $leaderboardPos = $db->fetchOne(
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
             min-height: 100vh;
         }
+        <?php if (($_SESSION['user_role'] ?? 'admin') === 'teacher'): ?>
+        body { background: #f1f5f9 !important; }
+        .main-content { background: #f1f5f9; }
+        .stat-card { background: #fff; border-color: #e2e8f0; }
+        .stat-card .value { color: #1e293b; }
+        .stat-card .label { color: #64748b; }
+        .xp-card { background: #fff; border-color: #e2e8f0; }
+        .xp-card .card-header { background: #fff; border-color: #e2e8f0; }
+        .xp-card .card-header h5 { color: #1e293b; }
+        .xp-table th { color: #64748b; }
+        .xp-table td { color: #1e293b; border-color: #e2e8f0; }
+        .form-control, .form-select { background: #fff; border-color: #e2e8f0; color: #1e293b; }
+        .form-label { color: #64748b; }
+        .text-muted { color: #64748b !important; }
+        .text-white { color: #1e293b !important; }
+        .modal-content { background: #fff; }
+        .modal-header { border-color: #e2e8f0; }
+        .modal-footer { border-color: #e2e8f0; }
+        .page-header h2 { color: #1e293b; }
+        .page-header p { color: #64748b; }
+        .sidebar { background: #fff; border-color: #e2e8f0; }
+        .sidebar-brand h4 { color: #1e293b; }
+        .sidebar-brand small { color: #64748b; }
+        .sidebar-nav a { color: #64748b; }
+        .sidebar-nav a:hover, .sidebar-nav a.active { background: rgba(99, 102, 241, 0.1); color: #6366f1; }
+        .sidebar-nav .nav-section { color: #64748b; }
+        .quick-action { background: #fff; border-color: #e2e8f0; color: #1e293b; }
+        .quick-action:hover { border-color: #6366f1; background: rgba(99, 102, 241, 0.05); color: #1e293b; }
+        .student-name { color: #1e293b; }
+        .student-detail { color: #64748b; }
+        .activity-content strong { color: #1e293b; }
+        .activity-time { color: #64748b; }
+        .activity-item { border-color: #e2e8f0; }
+        .leaderboard-item { border-color: #e2e8f0; }
+        .rank.default { background: #f1f5f9; color: #64748b; }
+        <?php endif; ?>
 
         /* Sidebar */
         .sidebar {
