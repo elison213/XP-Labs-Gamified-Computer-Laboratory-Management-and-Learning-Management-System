@@ -60,3 +60,5 @@ Stack trace:
   thrown in C:\xampp\htdocs\xplabs\lib\Database.php on line 58
 [03-Apr-2026 15:28:25 Asia/Manila] saveFloorLayout error: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '300-A-8' for key 'unique_position'
 [03-Apr-2026 15:43:53 Asia/Manila] saveFloorLayout error: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '300-A-8' for key 'unique_position'
+[03-Apr-2026 15:46:45 Asia/Manila] saveFloorLayout: floorId=300, gridCols=8, gridRows=7, result=1
+[03-Apr-2026 15:46:47 Asia/Manila] saveFloorLayout: floorId=300, gridCols=8, gridRows=7, result=0
