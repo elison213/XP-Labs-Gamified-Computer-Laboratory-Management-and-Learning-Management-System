@@ -10,6 +10,39 @@ use XPLabs\Lib\Database;
 Auth::requireRole(['admin', 'teacher']);
 
 $db = Database::getInstance();
+
+// Handle CSV export
+if (isset($_GET['export']) && $_GET['export'] === 'csv') {
+    header('Content-Type: text/csv');
+    header('Content-Disposition: attachment; filename="submissions_' . date('Y-m-d') . '.csv"');
+    $out = fopen('php://output', 'w');
+    fputcsv($out, ['Student', 'LRN', 'Assignment', 'Submitted At', 'Status', 'Grade', 'Max Points', 'Percentage']);
+    
+    $exportSubs = $db->fetchAll(
+        "SELECT s.*, a.title as assignment_title, a.max_points, u.lrn, u.first_name, u.last_name
+         FROM submissions s
+         JOIN assignments a ON s.assignment_id = a.id
+         JOIN users u ON s.user_id = u.id
+         WHERE $whereClause
+         ORDER BY s.submitted_at DESC LIMIT 5000",
+        $params
+    );
+    foreach ($exportSubs as $s) {
+        $pct = $s['max_points'] > 0 ? round(($s['grade'] / $s['max_points']) * 100, 1) : 0;
+        fputcsv($out, [
+            $s['first_name'] . ' ' . $s['last_name'],
+            $s['lrn'],
+            $s['assignment_title'],
+            $s['submitted_at'] ?? '',
+            $s['status'] ?: ($s['is_late'] ? 'late' : 'submitted'),
+            $s['grade'] ?? '',
+            $s['max_points'],
+            $pct . '%'
+        ]);
+    }
+    fclose($out);
+    exit;
+}
 $role = $_SESSION['user_role'];
 $userId = Auth::id();
 
@@ -228,6 +261,9 @@ $submissions = $db->fetchAll(
                 <h2 class="mb-1"><i class="bi bi-upload me-2"></i>Submissions</h2>
                 <p class="text-muted mb-0">Review and grade student submissions</p>
             </div>
+            <a href="?<?= http_build_query(array_merge($_GET, ['export' => 'csv'])) ?>" class="btn btn-success">
+                <i class="bi bi-file-earmark-spreadsheet me-1"></i> Export CSV
+            </a>
         </div>
 
         <?php if ($message): ?>
