@@ -251,15 +251,27 @@ class LabService
     {
         $this->db->beginTransaction();
         try {
+            $gridCols = (int) ($layoutData['grid']['cols'] ?? 6);
+            $gridRows = (int) ($layoutData['grid']['rows'] ?? 5);
+            
             // Update floor grid config
-            $this->db->update('lab_floors', [
-                'grid_cols' => $layoutData['grid']['cols'] ?? 6,
-                'grid_rows' => $layoutData['grid']['rows'] ?? 5,
+            $result = $this->db->update('lab_floors', [
+                'grid_cols' => $gridCols,
+                'grid_rows' => $gridRows,
                 'layout_config' => json_encode($layoutData['config'] ?? []),
             ], 'id = ?', [$floorId]);
+            
+            error_log("saveFloorLayout: floorId=$floorId, gridCols=$gridCols, gridRows=$gridRows, result=$result");
 
-            // Update stations
+            // Update stations - first clear all positions to avoid unique constraint conflicts
             if (!empty($layoutData['stations'])) {
+                // Step 1: Temporarily set all stations to NULL position
+                $this->db->query(
+                    "UPDATE lab_stations SET row_label = NULL, col_number = NULL WHERE floor_id = ?",
+                    [$floorId]
+                );
+                
+                // Step 2: Now set the new positions
                 foreach ($layoutData['stations'] as $stationData) {
                     if (!empty($stationData['id'])) {
                         $this->updateStation((int) $stationData['id'], [
