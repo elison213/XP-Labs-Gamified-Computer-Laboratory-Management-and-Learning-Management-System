@@ -193,7 +193,7 @@ if ($role === 'admin') {
         <div class="xp-card">
             <div class="card-body text-center py-5">
                 <i class="bi bi-megaphone fs-1 text-muted d-block mb-3"></i>
-                <h4 class="text-white">No Announcements Yet</h4>
+                <h4>No Announcements Yet</h4>
                 <p class="text-muted">Check back later for updates</p>
             </div>
         </div>

@@ -169,7 +169,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
                 <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalCreate">
                     <i class="bi bi-plus-lg me-1"></i> Add User
                 </button>
-                <button class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#modalImport">
+                <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#modalImport">
                     <i class="bi bi-upload me-1"></i> Import CSV
                 </button>
             </div>

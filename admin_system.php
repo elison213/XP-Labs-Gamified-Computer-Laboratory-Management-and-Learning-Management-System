@@ -232,12 +232,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
                     <i class="bi bi-plus-lg me-1"></i> Add Lab
                 </button>
                 <?php if ($selectedLabId): ?>
-                <button class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#modalAddFloor">
+                <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#modalAddFloor">
                     <i class="bi bi-building me-1"></i> Add Floor
                 </button>
                 <?php endif; ?>
                 <?php if ($selectedFloorId): ?>
-                <button class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#modalAddStation">
+                <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#modalAddStation">
                     <i class="bi bi-pc-display me-1"></i> Add Station
                 </button>
                 <?php endif; ?>
@@ -395,7 +395,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
         <div class="xp-card">
             <div class="card-body text-center py-5">
                 <i class="bi bi-building fs-1 text-muted d-block mb-3"></i>
-                <h4 class="text-white">No Floor Selected</h4>
+                <h4>No Floor Selected</h4>
                 <p class="text-muted">Create a floor to get started</p>
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalAddFloor">
                     <i class="bi bi-plus-lg me-1"></i> Create First Floor
@@ -407,7 +407,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
         <div class="xp-card">
             <div class="card-body text-center py-5">
                 <i class="bi bi-building fs-1 text-muted d-block mb-3"></i>
-                <h4 class="text-white">No Lab Selected</h4>
+                <h4>No Lab Selected</h4>
                 <p class="text-muted">Create a lab to get started</p>
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalAddLab">
                     <i class="bi bi-plus-lg me-1"></i> Create First Lab

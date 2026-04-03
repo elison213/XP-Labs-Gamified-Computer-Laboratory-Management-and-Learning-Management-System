@@ -421,7 +421,7 @@ $leaderboardPos = $db->fetchOne(
                             <div class="attendance-icon text-success">
                                 <i class="bi bi-check-circle-fill"></i>
                             </div>
-                            <h5 class="text-white mb-1">You're checked in!</h5>
+                            <h5 class="mb-1" style="color: var(--text)">You're checked in!</h5>
                             <p class="text-muted mb-0">Clock-in: <?= date('g:i A', strtotime($todayAttendance['clock_in'])) ?></p>
                             <?php if ($todayAttendance['clock_out']): ?>
                             <p class="text-muted mb-0">Clock-out: <?= date('g:i A', strtotime($todayAttendance['clock_out'])) ?></p>
@@ -432,7 +432,7 @@ $leaderboardPos = $db->fetchOne(
                             <div class="attendance-icon text-warning">
                                 <i class="bi bi-clock-fill"></i>
                             </div>
-                            <h5 class="text-white mb-1">Not checked in yet</h5>
+                            <h5 class="mb-1" style="color: var(--text)">Not checked in yet</h5>
                             <p class="text-muted mb-2">Scan your QR code at the kiosk to clock in</p>
                             <a href="qr_scan.php" class="btn btn-primary">
                                 <i class="bi bi-qr-code me-1"></i> Go to Kiosk
@@ -446,7 +446,7 @@ $leaderboardPos = $db->fetchOne(
                 <div class="xp-card mb-3">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h5><i class="bi bi-journal-text me-2"></i>Active Assignments</h5>
-                        <a href="assignments.php" class="btn btn-sm btn-outline-light">View All</a>
+                        <a href="assignments.php" class="btn btn-sm btn-outline-secondary">View All</a>
                     </div>
                     <div class="card-body">
                         <?php foreach ($activeAssignments as $assignment): 
@@ -525,21 +525,21 @@ $leaderboardPos = $db->fetchOne(
                         <a href="leaderboard.php" class="quick-action d-flex align-items-center gap-3 p-3 rounded text-decoration-none mb-2" style="background: var(--bg-dark); border: 1px solid var(--border); color: var(--text);">
                             <i class="bi bi-trophy text-warning fs-4"></i>
                             <div>
-                                <div class="fw-semibold text-white">Leaderboard</div>
+                                <div class="fw-semibold" style="color: var(--text)">Leaderboard</div>
                                 <small class="text-muted">See your ranking</small>
                             </div>
                         </a>
                         <a href="qr_scan.php" class="quick-action d-flex align-items-center gap-3 p-3 rounded text-decoration-none mb-2" style="background: var(--bg-dark); border: 1px solid var(--border); color: var(--text);">
                             <i class="bi bi-qr-code text-success fs-4"></i>
                             <div>
-                                <div class="fw-semibold text-white">QR Check-In</div>
+                                <div class="fw-semibold" style="color: var(--text)">QR Check-In</div>
                                 <small class="text-muted">Clock in to lab</small>
                             </div>
                         </a>
                         <a href="profile_student.php" class="quick-action d-flex align-items-center gap-3 p-3 rounded text-decoration-none" style="background: var(--bg-dark); border: 1px solid var(--border); color: var(--text);">
                             <i class="bi bi-person text-info fs-4"></i>
                             <div>
-                                <div class="fw-semibold text-white">My Profile</div>
+                                <div class="fw-semibold" style="color: var(--text)">My Profile</div>
                                 <small class="text-muted">View details</small>
                             </div>
                         </a>

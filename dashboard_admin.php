@@ -281,7 +281,7 @@ $floors = $labService->getFloors();
                 <div class="xp-card mb-3">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h5><i class="bi bi-building me-2"></i>Lab Floors</h5>
-                        <a href="admin_system.php" class="btn btn-sm btn-outline-light">Manage</a>
+                        <a href="admin_system.php" class="btn btn-sm btn-outline-secondary">Manage</a>
                     </div>
                     <div class="card-body">
                         <div class="row g-3">

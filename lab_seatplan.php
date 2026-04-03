@@ -336,13 +336,13 @@ $gridRows = $currentFloor['grid_rows'] ?? 5;
             <div class="d-flex align-items-center gap-2">
                 <span class="text-muted small">Columns:</span>
                 <button class="btn btn-sm btn-outline-secondary" onclick="changeCols(-1)"><i class="bi bi-dash"></i></button>
-                <span class="text-white fw-bold" id="col-count"><?= $gridCols ?></span>
+                <span class="fw-bold" id="col-count"><?= $gridCols ?></span>
                 <button class="btn btn-sm btn-outline-secondary" onclick="changeCols(1)"><i class="bi bi-plus"></i></button>
             </div>
             <div class="d-flex align-items-center gap-2">
                 <span class="text-muted small">Rows:</span>
                 <button class="btn btn-sm btn-outline-secondary" onclick="changeRows(-1)"><i class="bi bi-dash"></i></button>
-                <span class="text-white fw-bold" id="row-count"><?= $gridRows ?></span>
+                <span class="fw-bold" id="row-count"><?= $gridRows ?></span>
                 <button class="btn btn-sm btn-outline-secondary" onclick="changeRows(1)"><i class="bi bi-plus"></i></button>
             </div>
             <div class="ms-auto">
@@ -419,7 +419,7 @@ $gridRows = $currentFloor['grid_rows'] ?? 5;
         <?php else: ?>
         <div class="text-center py-5">
             <i class="bi bi-building fs-1 text-muted d-block mb-3"></i>
-            <h4 class="text-white">No Floor Selected</h4>
+            <h4>No Floor Selected</h4>
             <p class="text-muted">Create a lab floor first in Lab Settings</p>
             <a href="admin_system.php" class="btn btn-primary">Go to Lab Settings</a>
         </div>
