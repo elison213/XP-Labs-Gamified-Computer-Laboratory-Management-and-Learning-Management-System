@@ -47,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
                 $message = ['type' => 'success', 'text' => 'Assignment updated successfully'];
                 break;
             case 'delete':
-                $db->update('assignments', ['is_active' => 0], 'id = ?', [(int) $_POST['assignment_id']]);
+                $db->update('assignments', ['status' => 'archived'], 'id = ?', [(int) $_POST['assignment_id']]);
                 $message = ['type' => 'success', 'text' => 'Assignment deleted'];
                 break;
         }
@@ -57,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
 }
 
 // Get courses for dropdown
-$courses = $db->fetchAll("SELECT * FROM courses WHERE is_active = 1 ORDER BY name ASC");
+$courses = $db->fetchAll("SELECT * FROM courses WHERE status != 'archived' ORDER BY name ASC");
 
 // Get assignments
 $assignments = $db->fetchAll(
@@ -67,7 +67,7 @@ $assignments = $db->fetchAll(
      FROM assignments a
      LEFT JOIN courses c ON a.course_id = c.id
      LEFT JOIN submissions s ON a.id = s.assignment_id
-     WHERE a.is_active = 1
+     WHERE a.status != 'archived'
      GROUP BY a.id
      ORDER BY a.due_date ASC, a.created_at DESC"
 );
