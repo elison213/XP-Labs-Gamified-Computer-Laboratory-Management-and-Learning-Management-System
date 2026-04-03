@@ -50,3 +50,11 @@ Stack trace:
 #3 C:\xampp\htdocs\xplabs\monitoring.php(16): XPLabs\Services\LabService->getFloors()
 #4 {main}
   thrown in C:\xampp\htdocs\xplabs\lib\Database.php on line 58
+[03-Apr-2026 15:09:18 Asia/Manila] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'xplabs.labs' doesn't exist in C:\xampp\htdocs\xplabs\lib\Database.php:58
+Stack trace:
+#0 C:\xampp\htdocs\xplabs\lib\Database.php(58): PDO->prepare('SELECT * FROM l...')
+#1 C:\xampp\htdocs\xplabs\lib\Database.php(77): XPLabs\Lib\Database->query('SELECT * FROM l...', Array)
+#2 C:\xampp\htdocs\xplabs\services\LabService.php(25): XPLabs\Lib\Database->fetchAll('SELECT * FROM l...')
+#3 C:\xampp\htdocs\xplabs\admin_system.php(14): XPLabs\Services\LabService->getLabs()
+#4 {main}
+  thrown in C:\xampp\htdocs\xplabs\lib\Database.php on line 58
