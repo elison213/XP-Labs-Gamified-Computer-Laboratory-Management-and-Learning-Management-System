@@ -153,3 +153,8 @@ Stack trace:
 #2 C:\xampp\htdocs\xplabs\quizzes_manage.php(42): XPLabs\Lib\Database->fetchAll('SELECT * FROM c...')
 #3 {main}
   thrown in C:\xampp\htdocs\xplabs\lib\Database.php on line 58
+[03-Apr-2026 17:43:56 Asia/Manila] PHP Fatal error:  Uncaught TypeError: array_sum(): Argument #1 ($array) must be of type array, int given in C:\xampp\htdocs\xplabs\incidents.php:167
+Stack trace:
+#0 C:\xampp\htdocs\xplabs\incidents.php(167): array_sum(0)
+#1 {main}
+  thrown in C:\xampp\htdocs\xplabs\incidents.php on line 167

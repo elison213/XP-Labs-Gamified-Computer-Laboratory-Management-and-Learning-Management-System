@@ -164,19 +164,19 @@ $stats = $service->getStats();
             </div>
             <div class="col-md-3">
                 <div class="stat-card">
-                    <div class="value text-warning"><?= array_sum(array_column(array_filter($incidents, fn($i) => $i['status'] === 'reported'), 'id') ? 1 : 0) ?></div>
+                    <div class="value text-warning"><?= count(array_filter($incidents, fn($i) => $i['status'] === 'reported')) ?></div>
                     <div class="label">Open</div>
                 </div>
             </div>
             <div class="col-md-3">
                 <div class="stat-card">
-                    <div class="value" style="color: var(--orange)"><?= array_sum(array_column(array_filter($incidents, fn($i) => $i['status'] === 'investigating'), 'id') ? 1 : 0) ?></div>
+                    <div class="value" style="color: var(--orange)"><?= count(array_filter($incidents, fn($i) => $i['status'] === 'investigating')) ?></div>
                     <div class="label">Investigating</div>
                 </div>
             </div>
             <div class="col-md-3">
                 <div class="stat-card">
-                    <div class="value text-success"><?= array_sum(array_column(array_filter($incidents, fn($i) => $i['status'] === 'resolved'), 'id') ? 1 : 0) ?></div>
+                    <div class="value text-success"><?= count(array_filter($incidents, fn($i) => $i['status'] === 'resolved')) ?></div>
                     <div class="label">Resolved</div>
                 </div>
             </div>
