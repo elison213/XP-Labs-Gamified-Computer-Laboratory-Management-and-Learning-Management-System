@@ -15,7 +15,7 @@ $userId = Auth::id();
 
 // Get leaderboard from user_point_balances
 $leaderboard = $db->fetchAll(
-    "SELECT u.id, u.lrn, u.first_name, u.last_name, u.avatar_url,
+    "SELECT u.id, u.lrn, u.first_name, u.last_name,
             COALESCE(upb.total_points, 0) as total_points,
             COALESCE(upb.current_streak, 0) as current_streak,
             COALESCE(upb.best_streak, 0) as best_streak,
