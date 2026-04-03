@@ -18,7 +18,7 @@
         <a href="my_quizzes.php" class="<?= basename($_SERVER['PHP_SELF']) === 'my_quizzes.php' ? 'active' : '' ?>">
             <i class="bi bi-question-circle"></i> My Quizzes
         </a>
-        <a href="submissions.php" class="<?= basename($_SERVER['PHP_SELF']) === 'submissions.php' ? 'active' : '' ?>">
+        <a href="my_submissions.php" class="<?= basename($_SERVER['PHP_SELF']) === 'my_submissions.php' ? 'active' : '' ?>">
             <i class="bi bi-upload"></i> My Submissions
         </a>
         
