@@ -100,6 +100,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
             min-height: 100vh;
         }
+        <?php if (($_SESSION['user_role'] ?? 'admin') === 'teacher'): ?>
+        body { background: #f1f5f9 !important; }
+        .main-content { background: #f1f5f9; }
+        .xp-card { background: #fff; border-color: #e2e8f0; }
+        .xp-card .card-header { background: #fff; border-color: #e2e8f0; }
+        .xp-card .card-header h5 { color: #1e293b; }
+        .xp-table th { color: #64748b; }
+        .xp-table td { color: #1e293b; border-color: #e2e8f0; }
+        .xp-table tr:hover { background: rgba(99,102,241,0.05); }
+        .form-control, .form-select { background: #fff; border-color: #e2e8f0; color: #1e293b; }
+        .form-label { color: #64748b; }
+        .stat-card { background: #fff; border-color: #e2e8f0; }
+        .stat-card .value { color: #1e293b; }
+        .stat-card .label { color: #64748b; }
+        .text-muted { color: #64748b !important; }
+        .text-white { color: #1e293b !important; }
+        .modal-content { background: #fff; }
+        .modal-header { border-color: #e2e8f0; }
+        .modal-footer { border-color: #e2e8f0; }
+        <?php endif; ?>
 
         .sidebar {
             position: fixed; top: 0; left: 0; width: 260px; height: 100vh;
