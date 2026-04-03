@@ -63,92 +63,6 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
             margin: 0;
             min-height: 100vh;
         }
-        <?php if (($_SESSION['user_role'] ?? 'admin') === 'teacher'): ?>
-        /* Teacher mode: light background - ALL !important for override */
-        body { background: #f1f5f9 !important; color: #1e293b !important; }
-        .topbar { background: #fff !important; border-color: #e2e8f0 !important; }
-        .topbar-brand h5 { color: #1e293b !important; }
-        .topbar-brand span { color: #64748b !important; }
-        .stats-bar { background: #fff !important; border-color: #e2e8f0 !important; }
-        .stat-chip { background: #fff !important; border-color: #e2e8f0 !important; }
-        .stat-count { color: #1e293b !important; }
-        .stat-label { color: #64748b !important; }
-        .stat-dot.green { background: #22c55e !important; box-shadow: 0 0 8px #22c55e !important; }
-        .stat-dot.yellow { background: #eab308 !important; }
-        .stat-dot.red { background: #ef4444 !important; }
-        .stat-dot.gray { background: #64748b !important; }
-        .floor-tabs { border-color: #e2e8f0 !important; }
-        .floor-tab { background: #fff !important; border-color: #e2e8f0 !important; color: #64748b !important; }
-        .floor-tab:hover { color: #1e293b !important; }
-        .floor-tab.active { background: #6366f1 !important; border-color: #6366f1 !important; color: #fff !important; }
-        .side-panel { background: #fff !important; border-color: #e2e8f0 !important; }
-        .seat-card { background: #fff !important; border-color: #e2e8f0 !important; }
-        .seat-card:hover { border-color: #6366f1 !important; }
-        .seat-card.active { border-color: #22c55e !important; background: rgba(34, 197, 94, 0.1) !important; }
-        .seat-card.idle { border-color: #eab308 !important; background: rgba(234, 179, 8, 0.05) !important; }
-        .seat-card.offline { border-color: #64748b !important; opacity: 0.6 !important; }
-        .seat-card.maintenance { border-color: #ef4444 !important; background: rgba(239, 68, 68, 0.1) !important; }
-        .seat-number { color: #1e293b !important; }
-        .seat-user { color: #64748b !important; }
-        .seat-task { color: #6366f1 !important; }
-        .seat-icon { color: #64748b !important; }
-        .teacher-desk-indicator { background: linear-gradient(135deg, #e0e7ff, #c7d2fe) !important; border-color: #6366f1 !important; color: #312e81 !important; }
-        .floor-title { color: #1e293b !important; }
-        .panel-section h6 { color: #64748b !important; border-color: #e2e8f0 !important; }
-        .panel-section-title { color: #1e293b !important; }
-        .panel-item { background: #f8fafc !important; border-color: #e2e8f0 !important; }
-        .panel-item-title { color: #1e293b !important; }
-        .panel-item-subtitle { color: #64748b !important; }
-        .btn-outline-light { color: #1e293b !important; border-color: #e2e8f0 !important; }
-        .btn-outline-light:hover { background: #f1f5f9 !important; color: #1e293b !important; }
-        .text-muted { color: #64748b !important; }
-        .text-white { color: #1e293b !important; }
-        .form-control, .form-select { background: #fff !important; border-color: #e2e8f0 !important; color: #1e293b !important; }
-        .modal-content { background: #fff !important; }
-        .modal-header { border-color: #e2e8f0 !important; }
-        .modal-footer { border-color: #e2e8f0 !important; }
-        .board-indicator { background: linear-gradient(135deg, #e0e7ff, #c7d2fe) !important; border-color: #a5b4fc !important; color: #312e81 !important; }
-        .seat-plan-card { background: #fff !important; border-color: #e2e8f0 !important; }
-        .seat-plan-card:hover { border-color: #6366f1 !important; }
-        .seat-plan-card.active { border-color: #22c55e !important; background: rgba(34, 197, 94, 0.1) !important; }
-        .seat-plan-card.idle { border-color: #eab308 !important; background: rgba(234, 179, 8, 0.05) !important; }
-        .seat-plan-card.offline { border-color: #64748b !important; opacity: 0.5 !important; }
-        .seat-plan-card.maintenance { border-color: #ef4444 !important; background: rgba(239, 68, 68, 0.1) !important; }
-        .seat-plan-card .seat-number { color: #1e293b !important; }
-        .seat-plan-card .seat-user { color: #64748b !important; }
-        .seat-plan-cell { border-color: #e2e8f0 !important; }
-        .view-btn { background: #fff !important; border-color: #e2e8f0 !important; color: #64748b !important; }
-        .view-btn:hover { border-color: #6366f1 !important; color: #1e293b !important; }
-        .view-btn.active { background: #6366f1 !important; border-color: #6366f1 !important; color: #fff !important; }
-        .seat-detail { background: #fff !important; }
-        .detail-label { color: #64748b !important; }
-        .detail-value { color: #1e293b !important; }
-        .action-btn { background: #fff !important; border-color: #e2e8f0 !important; color: #1e293b !important; }
-        .action-btn:hover { border-color: #6366f1 !important; background: rgba(99, 102, 241, 0.1) !important; }
-        .filter-btn { background: #fff !important; border-color: #e2e8f0 !important; color: #64748b !important; }
-        .filter-btn:hover, .filter-btn.active { background: #6366f1 !important; border-color: #6366f1 !important; color: #fff !important; }
-        .empty-state { color: #64748b !important; }
-        .sidebar { background: #fff !important; border-color: #e2e8f0 !important; }
-        .sidebar-brand h4 { color: #1e293b !important; }
-        .sidebar-brand small { color: #64748b !important; }
-        .sidebar-nav a { color: #64748b !important; }
-        .sidebar-nav a:hover, .sidebar-nav a.active { background: rgba(99, 102, 241, 0.1) !important; color: #6366f1 !important; }
-        .sidebar-nav .nav-section { color: #64748b !important; }
-        .seat-status.active { background: #22c55e !important; box-shadow: 0 0 10px #22c55e !important; }
-        .seat-status.idle { background: #eab308 !important; }
-        .seat-status.offline { background: #64748b !important; }
-        .seat-status.maintenance { background: #ef4444 !important; }
-        .seat-plan-card .seat-status.active { background: #22c55e !important; box-shadow: 0 0 6px #22c55e !important; }
-        .seat-plan-card .seat-status.idle { background: #eab308 !important; }
-        .seat-plan-card .seat-status.offline { background: #64748b !important; }
-        .seat-plan-card .seat-status.maintenance { background: #ef4444 !important; }
-        .seat-plan-card .seat-icon .text-success { color: #22c55e !important; }
-        .seat-plan-card .seat-icon .text-warning { color: #eab308 !important; }
-        .seat-plan-card .seat-icon .text-danger { color: #ef4444 !important; }
-        .seat-plan-card .seat-icon .text-secondary { color: #64748b !important; }
-        .seat-card .seat-icon .text-muted { color: #64748b !important; }
-        .seat-plan-cell span.text-muted { color: #94a3b8 !important; }
-        <?php endif; ?>
 
         /* Top Bar */
         .topbar {
@@ -505,6 +419,86 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
             color: var(--text-muted);
         }
         .empty-state i { font-size: 3rem; margin-bottom: 1rem; opacity: 0.5; }
+        <?php if (($_SESSION['user_role'] ?? 'admin') === 'teacher'): ?>
+        /* Teacher mode: light theme - placed at END for cascade override */
+        body { background: #f1f5f9 !important; color: #1e293b !important; }
+        .topbar { background: #fff !important; border-color: #e2e8f0 !important; }
+        .topbar-brand h5 { color: #1e293b !important; }
+        .topbar-brand span { color: #64748b !important; }
+        .stats-bar { background: #fff !important; border-color: #e2e8f0 !important; }
+        .stat-chip { background: #fff !important; border-color: #e2e8f0 !important; }
+        .stat-count { color: #1e293b !important; }
+        .stat-label { color: #64748b !important; }
+        .stat-dot.green { background: #22c55e !important; box-shadow: 0 0 8px #22c55e !important; }
+        .stat-dot.yellow { background: #eab308 !important; }
+        .stat-dot.red { background: #ef4444 !important; }
+        .stat-dot.gray { background: #64748b !important; }
+        .floor-tabs { border-color: #e2e8f0 !important; }
+        .floor-tab { background: #fff !important; border-color: #e2e8f0 !important; color: #64748b !important; }
+        .floor-tab:hover { color: #1e293b !important; }
+        .floor-tab.active { background: #6366f1 !important; border-color: #6366f1 !important; color: #fff !important; }
+        .side-panel { background: #fff !important; border-color: #e2e8f0 !important; }
+        .seat-card { background: #fff !important; border-color: #e2e8f0 !important; }
+        .seat-card:hover { border-color: #6366f1 !important; }
+        .seat-card.active { border-color: #22c55e !important; background: rgba(34, 197, 94, 0.1) !important; }
+        .seat-card.idle { border-color: #eab308 !important; background: rgba(234, 179, 8, 0.05) !important; }
+        .seat-card.offline { border-color: #64748b !important; opacity: 0.6 !important; }
+        .seat-card.maintenance { border-color: #ef4444 !important; background: rgba(239, 68, 68, 0.1) !important; }
+        .seat-number { color: #1e293b !important; }
+        .seat-user { color: #64748b !important; }
+        .seat-task { color: #6366f1 !important; }
+        .seat-icon { color: #64748b !important; }
+        .teacher-desk-indicator { background: linear-gradient(135deg, #e0e7ff, #c7d2fe) !important; border-color: #6366f1 !important; color: #312e81 !important; }
+        .floor-title { color: #1e293b !important; }
+        .panel-section h6 { color: #64748b !important; border-color: #e2e8f0 !important; }
+        .panel-section-title { color: #1e293b !important; }
+        .panel-item { background: #f8fafc !important; border-color: #e2e8f0 !important; }
+        .panel-item-title { color: #1e293b !important; }
+        .panel-item-subtitle { color: #64748b !important; }
+        .btn-outline-light { color: #1e293b !important; border-color: #e2e8f0 !important; }
+        .btn-outline-light:hover { background: #f1f5f9 !important; color: #1e293b !important; }
+        .text-muted { color: #64748b !important; }
+        .text-white { color: #1e293b !important; }
+        .form-control, .form-select { background: #fff !important; border-color: #e2e8f0 !important; color: #1e293b !important; }
+        .modal-content { background: #fff !important; }
+        .modal-header { border-color: #e2e8f0 !important; }
+        .modal-footer { border-color: #e2e8f0 !important; }
+        .board-indicator { background: linear-gradient(135deg, #e0e7ff, #c7d2fe) !important; border-color: #a5b4fc !important; color: #312e81 !important; }
+        .seat-plan-card { background: #fff !important; border-color: #e2e8f0 !important; }
+        .seat-plan-card:hover { border-color: #6366f1 !important; }
+        .seat-plan-card.active { border-color: #22c55e !important; background: rgba(34, 197, 94, 0.1) !important; }
+        .seat-plan-card.idle { border-color: #eab308 !important; background: rgba(234, 179, 8, 0.05) !important; }
+        .seat-plan-card.offline { border-color: #64748b !important; opacity: 0.5 !important; }
+        .seat-plan-card.maintenance { border-color: #ef4444 !important; background: rgba(239, 68, 68, 0.1) !important; }
+        .seat-plan-card .seat-number { color: #1e293b !important; }
+        .seat-plan-card .seat-user { color: #64748b !important; }
+        .seat-plan-cell { border-color: #e2e8f0 !important; }
+        .view-btn { background: #fff !important; border-color: #e2e8f0 !important; color: #64748b !important; }
+        .view-btn:hover { border-color: #6366f1 !important; color: #1e293b !important; }
+        .view-btn.active { background: #6366f1 !important; border-color: #6366f1 !important; color: #fff !important; }
+        .seat-detail { background: #fff !important; }
+        .detail-label { color: #64748b !important; }
+        .detail-value { color: #1e293b !important; }
+        .action-btn { background: #fff !important; border-color: #e2e8f0 !important; color: #1e293b !important; }
+        .action-btn:hover { border-color: #6366f1 !important; background: rgba(99, 102, 241, 0.1) !important; }
+        .filter-btn { background: #fff !important; border-color: #e2e8f0 !important; color: #64748b !important; }
+        .filter-btn:hover, .filter-btn.active { background: #6366f1 !important; border-color: #6366f1 !important; color: #fff !important; }
+        .empty-state { color: #64748b !important; }
+        .seat-status.active { background: #22c55e !important; box-shadow: 0 0 10px #22c55e !important; }
+        .seat-status.idle { background: #eab308 !important; }
+        .seat-status.offline { background: #64748b !important; }
+        .seat-status.maintenance { background: #ef4444 !important; }
+        .seat-plan-card .seat-status.active { background: #22c55e !important; box-shadow: 0 0 6px #22c55e !important; }
+        .seat-plan-card .seat-status.idle { background: #eab308 !important; }
+        .seat-plan-card .seat-status.offline { background: #64748b !important; }
+        .seat-plan-card .seat-status.maintenance { background: #ef4444 !important; }
+        .seat-plan-card .seat-icon .text-success { color: #22c55e !important; }
+        .seat-plan-card .seat-icon .text-warning { color: #eab308 !important; }
+        .seat-plan-card .seat-icon .text-danger { color: #ef4444 !important; }
+        .seat-plan-card .seat-icon .text-secondary { color: #64748b !important; }
+        .seat-card .seat-icon .text-muted { color: #64748b !important; }
+        .seat-plan-cell span.text-muted { color: #94a3b8 !important; }
+        <?php endif; ?>
     </style>
 </head>
 <body>
