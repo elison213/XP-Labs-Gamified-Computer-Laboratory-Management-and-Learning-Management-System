@@ -64,7 +64,7 @@ $upcomingQuizzes = $db->fetchAll(
     "SELECT q.*, c.name as course_name 
      FROM quizzes q
      JOIN courses c ON q.course_id = c.id
-     WHERE q.is_active = 1
+     WHERE q.status IN ('active', 'scheduled')
      ORDER BY q.created_at DESC
      LIMIT 5"
 );

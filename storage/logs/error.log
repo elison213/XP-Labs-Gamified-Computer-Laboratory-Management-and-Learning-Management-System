@@ -162,3 +162,10 @@ Stack trace:
 Stack trace:
 #0 {main}
   thrown in C:\xampp\htdocs\xplabs\dashboard_student.php on line 21
+[03-Apr-2026 20:33:46 Asia/Manila] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'q.is_active' in 'where clause' in C:\xampp\htdocs\xplabs\lib\Database.php:58
+Stack trace:
+#0 C:\xampp\htdocs\xplabs\lib\Database.php(58): PDO->prepare('SELECT q.*, c.n...')
+#1 C:\xampp\htdocs\xplabs\lib\Database.php(77): XPLabs\Lib\Database->query('SELECT q.*, c.n...', Array)
+#2 C:\xampp\htdocs\xplabs\dashboard_student.php(64): XPLabs\Lib\Database->fetchAll('SELECT q.*, c.n...')
+#3 {main}
+  thrown in C:\xampp\htdocs\xplabs\lib\Database.php on line 58
