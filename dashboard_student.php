@@ -140,6 +140,11 @@ $leaderboardPos = $db->fetchOne(
         .sidebar-nav .nav-section { color: #64748b; }
         .quick-action { background: #fff; border-color: #e2e8f0; color: #1e293b; }
         .quick-action:hover { border-color: #6366f1; background: rgba(99, 102, 241, 0.05); color: #1e293b; }
+        .quick-action .fw-semibold { color: #1e293b !important; }
+        .quick-action small { color: #64748b !important; }
+        .quick-action .text-muted { color: var(--text-muted) !important; }
+        .quick-action small.text-muted { color: var(--text-muted) !important; }
+        a.quick-action small.text-muted { color: var(--text-muted) !important; }
         .student-name { color: #1e293b; }
         .student-detail { color: #64748b; }
         .activity-content strong { color: #1e293b; }
@@ -515,21 +520,21 @@ $leaderboardPos = $db->fetchOne(
                             <i class="bi bi-trophy text-warning fs-4"></i>
                             <div>
                                 <div class="fw-semibold" style="color: var(--text)">Leaderboard</div>
-                                <small class="text-muted">See your ranking</small>
+                                <small style="color: var(--text-muted) !important;">See your ranking</small>
                             </div>
                         </a>
                         <a href="qr_scan.php" class="quick-action d-flex align-items-center gap-3 p-3 rounded text-decoration-none mb-2" style="background: var(--bg-dark); border: 1px solid var(--border); color: var(--text);">
                             <i class="bi bi-qr-code text-success fs-4"></i>
                             <div>
                                 <div class="fw-semibold" style="color: var(--text)">QR Check-In</div>
-                                <small class="text-muted">Clock in to lab</small>
+                                <small style="color: var(--text-muted) !important;">Clock in to lab</small>
                             </div>
                         </a>
                         <a href="profile_student.php" class="quick-action d-flex align-items-center gap-3 p-3 rounded text-decoration-none" style="background: var(--bg-dark); border: 1px solid var(--border); color: var(--text);">
                             <i class="bi bi-person text-info fs-4"></i>
                             <div>
                                 <div class="fw-semibold" style="color: var(--text)">My Profile</div>
-                                <small class="text-muted">View details</small>
+                                <small style="color: var(--text-muted) !important;">View details</small>
                             </div>
                         </a>
                     </div>
