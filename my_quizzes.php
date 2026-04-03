@@ -20,7 +20,6 @@ $availableQuizzes = $db->fetchAll(
             COALESCE(latest.best_score, 0) as best_score,
             latest.attempt_count,
             CASE 
-                WHEN latest.attempts_remaining = 0 THEN 'maxed'
                 WHEN q.scheduled_at > NOW() THEN 'upcoming'
                 WHEN q.closes_at < NOW() THEN 'closed'
                 ELSE 'available'
@@ -31,11 +30,9 @@ $availableQuizzes = $db->fetchAll(
      JOIN users u ON q.created_by = u.id
      LEFT JOIN (
          SELECT qa.quiz_id, qa.user_id,
-                MAX(qa.score_percentage) as best_score,
-                COUNT(*) as attempt_count,
-                GREATEST(0, COALESCE(q.max_attempts, 1) - COUNT(*)) as attempts_remaining
+                ROUND(AVG(CASE WHEN qa.total_score > 0 AND qa.max_score > 0 THEN (qa.total_score / qa.max_score) * 100 ELSE 0 END), 1) as best_score,
+                COUNT(*) as attempt_count
          FROM quiz_attempts qa
-         JOIN quizzes q ON qa.quiz_id = q.id
          WHERE qa.user_id = ?
          GROUP BY qa.quiz_id, qa.user_id
      ) latest ON q.id = latest.quiz_id AND latest.user_id = ?
@@ -43,11 +40,10 @@ $availableQuizzes = $db->fetchAll(
          SELECT quiz_id, COUNT(*) as question_count FROM quiz_questions GROUP BY quiz_id
      ) qq ON q.id = qq.quiz_id
      WHERE ce.user_id = ? AND q.status IN ('active', 'scheduled')
-     ORDER BY 
+         ORDER BY 
          CASE 
-             WHEN q.closes_at < NOW() THEN 4
+             WHEN q.closes_at < NOW() THEN 3
              WHEN q.scheduled_at > NOW() THEN 2
-             WHEN latest.attempts_remaining = 0 THEN 3
              ELSE 1
          END,
          q.closes_at ASC",
@@ -219,8 +215,6 @@ $avgScore = $scoredCount > 0 ? round($totalScored / $scoredCount, 1) : 0;
         <?php foreach ($availableQuizzes as $q): 
             $closesText = $q['closes_at'] ? date('M j, g:i A', strtotime($q['closes_at'])) : 'No deadline';
             $scheduledText = $q['scheduled_at'] ? date('M j, g:i A', strtotime($q['scheduled_at'])) : '';
-            $attemptsLeft = $q['max_attempts'] - ($q['attempt_count'] ?? 0);
-            $attemptsLeft = max(0, $attemptsLeft);
         ?>
         <div class="quiz-card">
             <div class="d-flex justify-content-between align-items-start mb-2">
@@ -242,7 +236,7 @@ $avgScore = $scoredCount > 0 ? round($totalScored / $scoredCount, 1) : 0;
                 <span><i class="bi bi-clock me-1"></i><?= $q['time_limit_per_q'] ?? 30 ?>s per question</span>
                 <span><i class="bi bi-list-ul me-1"></i><?= $q['question_count'] ?? 0 ?> questions</span>
                 <span><i class="bi bi-lightning me-1"></i>Powerups: <?= $q['allow_powerups'] ? 'Allowed' : 'Disabled' ?></span>
-                <span><i class="bi bi-bar-chart me-1"></i>Attempts: <?= $q['attempt_count'] ?? 0 ?>/<?= $q['max_attempts'] ?? '∞' ?></span>
+                <span><i class="bi bi-bar-chart me-1"></i>Taken: <?= $q['attempt_count'] ?? 0 ?> time(s)</span>
             </div>
             
             <div class="d-flex justify-content-between align-items-center mt-3">
@@ -258,16 +252,12 @@ $avgScore = $scoredCount > 0 ? round($totalScored / $scoredCount, 1) : 0;
                     <span class="score-display"><i class="bi bi-trophy me-1"></i>Best: <?= number_format($q['best_score'], 1) ?>%</span>
                     <?php endif; ?>
                     
-                    <?php if ($q['status'] === 'available' && $attemptsLeft > 0): ?>
-                    <a href="quiz_take.php?quiz=<?= $q['id'] ?>" class="btn btn-primary btn-sm">
-                        <i class="bi bi-play-fill me-1"></i> <?= $q['attempt_count'] ? 'Retry' : 'Start' ?>
-                    </a>
+                    <?php if ($q['status'] === 'available'): ?>
+                    <span class="btn btn-sm btn-outline-secondary disabled">Coming soon</span>
                     <?php elseif ($q['status'] === 'upcoming'): ?>
                     <span class="btn btn-sm btn-outline-secondary disabled">Not yet open</span>
                     <?php elseif ($q['status'] === 'closed'): ?>
                     <span class="btn btn-sm btn-outline-secondary disabled">Closed</span>
-                    <?php elseif ($attemptsLeft <= 0): ?>
-                    <span class="btn btn-sm btn-outline-secondary disabled">No attempts left</span>
                     <?php endif; ?>
                 </div>
             </div>
