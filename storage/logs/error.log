@@ -1,0 +1,52 @@
+[03-Apr-2026 13:39:59 Asia/Manila] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'sa.id' in 'field list' in C:\xampp\htdocs\xplabs\lib\Database.php:58
+Stack trace:
+#0 C:\xampp\htdocs\xplabs\lib\Database.php(58): PDO->prepare('SELECT s.*, c.n...')
+#1 C:\xampp\htdocs\xplabs\lib\Database.php(77): XPLabs\Lib\Database->query('SELECT s.*, c.n...', Array)
+#2 C:\xampp\htdocs\xplabs\dashboard_teacher.php(42): XPLabs\Lib\Database->fetchAll('SELECT s.*, c.n...', Array)
+#3 {main}
+  thrown in C:\xampp\htdocs\xplabs\lib\Database.php on line 58
+[03-Apr-2026 13:42:15 Asia/Manila] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 's.created_at' in 'where clause' in C:\xampp\htdocs\xplabs\lib\Database.php:58
+Stack trace:
+#0 C:\xampp\htdocs\xplabs\lib\Database.php(58): PDO->prepare('SELECT s.*, c.n...')
+#1 C:\xampp\htdocs\xplabs\lib\Database.php(77): XPLabs\Lib\Database->query('SELECT s.*, c.n...', Array)
+#2 C:\xampp\htdocs\xplabs\dashboard_teacher.php(42): XPLabs\Lib\Database->fetchAll('SELECT s.*, c.n...', Array)
+#3 {main}
+  thrown in C:\xampp\htdocs\xplabs\lib\Database.php on line 58
+[03-Apr-2026 13:42:22 Asia/Manila] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 's.created_at' in 'where clause' in C:\xampp\htdocs\xplabs\lib\Database.php:58
+Stack trace:
+#0 C:\xampp\htdocs\xplabs\lib\Database.php(58): PDO->prepare('SELECT s.*, c.n...')
+#1 C:\xampp\htdocs\xplabs\lib\Database.php(77): XPLabs\Lib\Database->query('SELECT s.*, c.n...', Array)
+#2 C:\xampp\htdocs\xplabs\dashboard_teacher.php(42): XPLabs\Lib\Database->fetchAll('SELECT s.*, c.n...', Array)
+#3 {main}
+  thrown in C:\xampp\htdocs\xplabs\lib\Database.php on line 58
+[03-Apr-2026 13:42:36 Asia/Manila] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 's.created_at' in 'where clause' in C:\xampp\htdocs\xplabs\lib\Database.php:58
+Stack trace:
+#0 C:\xampp\htdocs\xplabs\lib\Database.php(58): PDO->prepare('SELECT s.*, c.n...')
+#1 C:\xampp\htdocs\xplabs\lib\Database.php(77): XPLabs\Lib\Database->query('SELECT s.*, c.n...', Array)
+#2 C:\xampp\htdocs\xplabs\dashboard_teacher.php(42): XPLabs\Lib\Database->fetchAll('SELECT s.*, c.n...', Array)
+#3 {main}
+  thrown in C:\xampp\htdocs\xplabs\lib\Database.php on line 58
+[03-Apr-2026 13:45:35 Asia/Manila] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42000]: Syntax error or access violation: 1064 You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'AND status = 'active'' at line 1 in C:\xampp\htdocs\xplabs\lib\Database.php:58
+Stack trace:
+#0 C:\xampp\htdocs\xplabs\lib\Database.php(58): PDO->prepare('SELECT COUNT(*)...')
+#1 C:\xampp\htdocs\xplabs\lib\Database.php(85): XPLabs\Lib\Database->query('SELECT COUNT(*)...', Array)
+#2 C:\xampp\htdocs\xplabs\services\LabService.php(230): XPLabs\Lib\Database->fetchOne('SELECT COUNT(*)...', Array)
+#3 C:\xampp\htdocs\xplabs\dashboard_teacher.php(61): XPLabs\Services\LabService->getStats()
+#4 {main}
+  thrown in C:\xampp\htdocs\xplabs\lib\Database.php on line 58
+[03-Apr-2026 13:55:33 Asia/Manila] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'sort_order' in 'order clause' in C:\xampp\htdocs\xplabs\lib\Database.php:58
+Stack trace:
+#0 C:\xampp\htdocs\xplabs\lib\Database.php(58): PDO->prepare('SELECT * FROM l...')
+#1 C:\xampp\htdocs\xplabs\lib\Database.php(77): XPLabs\Lib\Database->query('SELECT * FROM l...', Array)
+#2 C:\xampp\htdocs\xplabs\services\LabService.php(25): XPLabs\Lib\Database->fetchAll('SELECT * FROM l...')
+#3 C:\xampp\htdocs\xplabs\monitoring.php(16): XPLabs\Services\LabService->getFloors()
+#4 {main}
+  thrown in C:\xampp\htdocs\xplabs\lib\Database.php on line 58
+[03-Apr-2026 13:59:42 Asia/Manila] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'sort_order' in 'order clause' in C:\xampp\htdocs\xplabs\lib\Database.php:58
+Stack trace:
+#0 C:\xampp\htdocs\xplabs\lib\Database.php(58): PDO->prepare('SELECT * FROM l...')
+#1 C:\xampp\htdocs\xplabs\lib\Database.php(77): XPLabs\Lib\Database->query('SELECT * FROM l...', Array)
+#2 C:\xampp\htdocs\xplabs\services\LabService.php(25): XPLabs\Lib\Database->fetchAll('SELECT * FROM l...')
+#3 C:\xampp\htdocs\xplabs\monitoring.php(16): XPLabs\Services\LabService->getFloors()
+#4 {main}
+  thrown in C:\xampp\htdocs\xplabs\lib\Database.php on line 58

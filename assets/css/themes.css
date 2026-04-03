@@ -1,0 +1,443 @@
+/*
+  XPLabs — role-specific UI shells (student / teacher / admin)
+  body classes: .theme-default | .theme-student | .theme-teacher | .theme-admin
+*/
+
+.sidebar-brand-area {
+  letter-spacing: 0.1em;
+}
+
+.shell-ribbon {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+}
+
+/* ---- Default / public (landing, login, QR) — cool neutral ---- */
+body.theme-default.bg-app::before {
+  background:
+    radial-gradient(ellipse 80% 50% at 15% 0%, rgba(100, 116, 139, 0.18), transparent 55%),
+    radial-gradient(ellipse 60% 45% at 90% 10%, rgba(71, 85, 105, 0.12), transparent 50%),
+    radial-gradient(ellipse 45% 35% at 50% 100%, rgba(148, 163, 184, 0.1), transparent 45%);
+}
+
+/* ---- Student — bright, playful “learning lab” ---- */
+body.theme-student {
+  --bs-primary: #2563eb;
+  --bs-primary-rgb: 37, 99, 235;
+  --role-accent: #06b6d4;
+  --role-accent-2: #22c55e;
+}
+
+body.theme-student.bg-app::before {
+  background:
+    radial-gradient(ellipse 90% 60% at 10% -10%, rgba(37, 99, 235, 0.24), transparent 55%),
+    radial-gradient(ellipse 70% 50% at 95% 5%, rgba(6, 182, 212, 0.16), transparent 50%),
+    radial-gradient(ellipse 50% 40% at 50% 100%, rgba(34, 197, 94, 0.1), transparent 45%);
+}
+
+body.theme-student .nav-xp {
+  background: linear-gradient(125deg, #0f172a 0%, #1d4ed8 42%, #0891b2 100%) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+body.theme-student .nav-xp::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #38bdf8, #22d3ee, #4ade80);
+  opacity: 0.85;
+}
+
+body.theme-student .nav-xp {
+  position: relative;
+}
+
+body.theme-student .sidebar-xp {
+  background: linear-gradient(180deg, #ffffff 0%, #f0f9ff 100%);
+  border-right: 1px solid rgba(37, 99, 235, 0.12) !important;
+  box-shadow: 8px 0 32px -12px rgba(37, 99, 235, 0.15);
+}
+
+body.theme-student .sidebar-xp .sidebar-brand-area {
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(6, 182, 212, 0.06));
+  border-bottom: 1px solid rgba(37, 99, 235, 0.1);
+}
+
+body.theme-student .sidebar .nav-link:not(.active) {
+  color: #475569 !important;
+}
+
+body.theme-student .sidebar .nav-link:not(.active):hover {
+  background: rgba(37, 99, 235, 0.08);
+}
+
+body.theme-student .sidebar .nav-link.active {
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.16), rgba(6, 182, 212, 0.12));
+  color: #1d4ed8 !important;
+  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.2);
+}
+
+body.theme-student .dashboard-main {
+  border-top: 4px solid transparent;
+  border-image: linear-gradient(90deg, #2563eb, #06b6d4, #22c55e) 1;
+}
+
+body.theme-student .shell-ribbon {
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  margin: -1rem -1rem 1rem -1rem;
+  background: linear-gradient(90deg, rgba(37, 99, 235, 0.08), rgba(6, 182, 212, 0.06));
+  border-bottom: 1px solid rgba(37, 99, 235, 0.1);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #1e40af;
+  letter-spacing: 0.02em;
+}
+
+body.theme-student .stat-card:hover {
+  border-color: rgba(6, 182, 212, 0.35);
+}
+
+body.theme-student .list-group-item:hover {
+  background: rgba(37, 99, 235, 0.06);
+}
+
+body.theme-student .table-hover tbody tr:hover {
+  background: rgba(37, 99, 235, 0.05);
+}
+
+/* ---- Teacher — warm “classroom / faculty” desk ---- */
+body.theme-teacher {
+  --bs-primary: #0d9488;
+  --bs-primary-rgb: 13, 148, 136;
+  --role-accent: #d97706;
+  --role-accent-2: #57534e;
+}
+
+body.theme-teacher.bg-app::before {
+  background:
+    radial-gradient(ellipse 85% 55% at 5% 0%, rgba(217, 119, 6, 0.14), transparent 52%),
+    radial-gradient(ellipse 65% 50% at 100% 15%, rgba(13, 148, 136, 0.12), transparent 48%),
+    radial-gradient(ellipse 55% 45% at 40% 100%, rgba(120, 113, 108, 0.08), transparent 45%);
+}
+
+body.theme-teacher.bg-app {
+  background-color: #faf8f5 !important;
+}
+
+body.theme-teacher .nav-xp {
+  background: linear-gradient(125deg, #134e4a 0%, #0f766e 38%, #78716c 100%) !important;
+  border-bottom: 1px solid rgba(254, 243, 199, 0.15);
+}
+
+body.theme-teacher .nav-xp::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #fbbf24, #f59e0b, #d97706);
+  opacity: 0.9;
+}
+
+body.theme-teacher .nav-xp {
+  position: relative;
+}
+
+body.theme-teacher .nav-xp .navbar-brand {
+  background: linear-gradient(135deg, #fff 0%, #fde68a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+body.theme-teacher .sidebar-xp {
+  background: linear-gradient(180deg, #fffefb 0%, #f5f0e8 100%);
+  border-right: 1px solid rgba(120, 113, 108, 0.2) !important;
+  box-shadow: 6px 0 28px -10px rgba(19, 78, 74, 0.18);
+}
+
+body.theme-teacher .sidebar-xp .sidebar-brand-area {
+  background: linear-gradient(135deg, rgba(13, 148, 136, 0.12), rgba(217, 119, 6, 0.08));
+  border-bottom: 1px solid rgba(120, 113, 108, 0.15);
+  color: #44403c !important;
+}
+
+body.theme-teacher .sidebar .nav-link {
+  color: #44403c !important;
+}
+
+body.theme-teacher .sidebar .nav-link:not(.active):hover {
+  background: rgba(13, 148, 136, 0.1);
+  transform: translateX(5px);
+}
+
+body.theme-teacher .sidebar .nav-link.active {
+  background: linear-gradient(135deg, rgba(13, 148, 136, 0.2), rgba(217, 119, 6, 0.12));
+  color: #0f766e !important;
+  box-shadow: 0 3px 14px rgba(13, 148, 136, 0.2);
+}
+
+body.theme-teacher .btn-primary {
+  background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%);
+  box-shadow: 0 4px 14px rgba(13, 148, 136, 0.35);
+}
+
+body.theme-teacher .btn-primary:hover {
+  box-shadow: 0 8px 24px rgba(13, 148, 136, 0.45);
+}
+
+body.theme-teacher .btn-outline-primary {
+  color: #0f766e;
+  border-color: #0d9488;
+}
+
+body.theme-teacher .btn-outline-primary:hover {
+  background: #0d9488;
+  border-color: #0d9488;
+  color: #fff;
+}
+
+body.theme-teacher .dashboard-main {
+  border-top: 4px solid transparent;
+  border-image: linear-gradient(90deg, #0d9488, #f59e0b, #78716c) 1;
+}
+
+body.theme-teacher .shell-ribbon {
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  margin: -1rem -1rem 1rem -1rem;
+  background: linear-gradient(90deg, rgba(13, 148, 136, 0.1), rgba(251, 191, 36, 0.1));
+  border-bottom: 1px solid rgba(120, 113, 108, 0.15);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #57534e;
+}
+
+body.theme-teacher .stat-card,
+body.theme-teacher .card {
+  border-radius: 0.65rem;
+  border-color: rgba(120, 113, 108, 0.12);
+}
+
+body.theme-teacher .stat-card:hover {
+  border-color: rgba(13, 148, 136, 0.3);
+}
+
+body.theme-teacher .text-primary {
+  color: #0d9488 !important;
+}
+
+body.theme-teacher .form-control:focus {
+  border-color: #0d9488;
+  box-shadow: 0 0 0 4px rgba(13, 148, 136, 0.18);
+}
+
+body.theme-teacher .table-hover tbody tr:hover {
+  background: rgba(13, 148, 136, 0.06);
+}
+
+/* ---- Admin — sharp “control plane” / system ---- */
+body.theme-admin {
+  --bs-primary: #7c3aed;
+  --bs-primary-rgb: 124, 58, 237;
+  --role-accent: #f43f5e;
+}
+
+body.theme-admin.bg-app::before {
+  background:
+    radial-gradient(ellipse 70% 50% at 0% 0%, rgba(124, 58, 237, 0.2), transparent 50%),
+    radial-gradient(ellipse 55% 45% at 100% 0%, rgba(244, 63, 94, 0.12), transparent 48%),
+    radial-gradient(ellipse 60% 50% at 50% 100%, rgba(15, 23, 42, 0.35), transparent 55%);
+}
+
+body.theme-admin.bg-app {
+  background-color: #e8e9ef !important;
+}
+
+body.theme-admin .nav-xp {
+  background: linear-gradient(125deg, #020617 0%, #1e1b4b 45%, #312e81 100%) !important;
+  border-bottom: 1px solid rgba(167, 139, 250, 0.2);
+}
+
+body.theme-admin .nav-xp::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #a855f7, #f43f5e, #22d3ee);
+  opacity: 0.9;
+}
+
+body.theme-admin .nav-xp {
+  position: relative;
+}
+
+body.theme-admin .nav-xp .navbar-text {
+  font-family: ui-monospace, 'Cascadia Code', 'Segoe UI Mono', monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  color: #c4b5fd !important;
+}
+
+body.theme-admin .sidebar-xp {
+  background: linear-gradient(180deg, #0f172a 0%, #020617 100%);
+  border-right: 1px solid rgba(148, 163, 184, 0.15) !important;
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.04);
+}
+
+body.theme-admin .sidebar-xp .sidebar-brand-area {
+  background: rgba(124, 58, 237, 0.15);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  color: #e2e8f0 !important;
+}
+
+body.theme-admin .sidebar .nav-link {
+  color: #cbd5e1 !important;
+}
+
+body.theme-admin .sidebar .nav-link:not(.active):hover {
+  background: rgba(124, 58, 237, 0.2);
+  color: #fff !important;
+}
+
+body.theme-admin .sidebar .nav-link.active {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.45), rgba(244, 63, 94, 0.2));
+  color: #fff !important;
+  box-shadow: 0 0 0 1px rgba(167, 139, 250, 0.35);
+}
+
+body.theme-admin .dashboard-main {
+  position: relative;
+  isolation: isolate;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  border-top: 3px solid #7c3aed;
+  border-radius: 0 0 0.5rem 0.5rem;
+  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
+}
+
+body.theme-admin .dashboard-main::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(rgba(148, 163, 184, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.06) 1px, transparent 1px);
+  background-size: 24px 24px;
+  pointer-events: none;
+  opacity: 0.5;
+  border-radius: inherit;
+}
+
+body.theme-admin .shell-ribbon {
+  gap: 0.5rem;
+  padding: 0.45rem 1rem;
+  margin: -1rem -1rem 1rem -1rem;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-family: ui-monospace, 'Cascadia Code', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-bottom: 1px solid rgba(124, 58, 237, 0.35);
+  position: relative;
+  z-index: 1;
+}
+
+body.theme-admin .shell-ribbon .shell-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 10px #22c55e;
+  animation: adminPulse 2s ease-in-out infinite;
+}
+
+@keyframes adminPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+body.theme-admin .stat-card,
+body.theme-admin .card {
+  border-radius: 0.35rem;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  position: relative;
+  z-index: 1;
+}
+
+body.theme-admin .card-header.bg-white {
+  background: #f8fafc !important;
+  border-bottom-color: rgba(15, 23, 42, 0.08) !important;
+  font-weight: 600;
+}
+
+body.theme-admin .btn-primary {
+  background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%);
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.35);
+}
+
+body.theme-admin .btn-primary:hover {
+  box-shadow: 0 8px 24px rgba(124, 58, 237, 0.45);
+}
+
+body.theme-admin .btn-success {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+}
+
+body.theme-admin .text-primary {
+  color: #7c3aed !important;
+}
+
+body.theme-admin .form-control:focus {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.15);
+}
+
+body.theme-admin .table-hover tbody tr:hover {
+  background: rgba(124, 58, 237, 0.06);
+}
+
+body.theme-admin .list-group-item:hover {
+  background: rgba(124, 58, 237, 0.05);
+}
+
+/* Role badge in navbar (optional) */
+.nav-role-pill {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+body.theme-student .nav-role-pill {
+  border-color: rgba(56, 189, 248, 0.45);
+  color: #e0f2fe;
+}
+
+body.theme-teacher .nav-role-pill {
+  border-color: rgba(251, 191, 36, 0.45);
+  color: #fef3c7;
+}
+
+body.theme-admin .nav-role-pill {
+  font-family: ui-monospace, monospace;
+  border-color: rgba(167, 139, 250, 0.45);
+  color: #e9d5ff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.theme-admin .shell-ribbon .shell-dot {
+    animation: none;
+  }
+}
