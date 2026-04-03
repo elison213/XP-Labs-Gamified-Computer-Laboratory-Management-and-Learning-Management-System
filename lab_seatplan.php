@@ -132,6 +132,26 @@ $gridRows = $currentFloor['grid_rows'] ?? 5;
         .floor-tab:hover { color: #1e293b; }
         .board { background: linear-gradient(135deg, #e0e7ff, #c7d2fe); border-color: #a5b4fc; color: #312e81; }
         .teacher-desk { background: linear-gradient(135deg, #e0e7ff, #c7d2fe); border-color: #6366f1; color: #312e81; }
+        .station-card:hover { border-color: #6366f1; }
+        .station-card.active { border-color: #22c55e; }
+        .station-card.idle { border-color: #eab308; }
+        .station-card.offline { border-color: #64748b; }
+        .station-card.maintenance { border-color: #ef4444; }
+        .grid-cell.drag-over { border-color: #6366f1; background: rgba(99, 102, 241, 0.1); }
+        .text-muted { color: #64748b !important; }
+        .text-white { color: #1e293b !important; }
+        .modal-content { background: #fff; }
+        .modal-header { border-color: #e2e8f0; }
+        .modal-footer { border-color: #e2e8f0; }
+        .alert { background: #fff; border-color: #e2e8f0; }
+        .btn-outline-light { color: #1e293b; border-color: #e2e8f0; }
+        .btn-outline-light:hover { background: #1e293b; color: #fff; }
+        .sidebar { background: #fff; border-color: #e2e8f0; }
+        .sidebar-brand h4 { color: #1e293b; }
+        .sidebar-brand small { color: #64748b; }
+        .sidebar-nav a { color: #64748b; }
+        .sidebar-nav a:hover, .sidebar-nav a.active { background: rgba(99, 102, 241, 0.1); color: #6366f1; }
+        .sidebar-nav .nav-section { color: #64748b; }
         <?php endif; ?>
 
         /* Toolbar */
