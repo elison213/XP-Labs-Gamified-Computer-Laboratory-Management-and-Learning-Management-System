@@ -33,9 +33,17 @@ $isTeacher = ($currentRole === 'teacher');
     color: var(--text-muted, #94a3b8); margin-top: 0.5rem;
 }
 <?php if ($isTeacher): ?>
+/* Teacher mode: light sidebar */
+.sidebar { background: #fff !important; border-color: #e2e8f0 !important; }
+.sidebar-brand { border-color: #e2e8f0 !important; }
+.sidebar-brand h4 { color: #1e293b !important; }
+.sidebar-brand small { color: #64748b !important; }
+.sidebar-nav a { color: #64748b !important; }
+.sidebar-nav a:hover, .sidebar-nav a.active { background: rgba(99, 102, 241, 0.1) !important; color: #6366f1 !important; }
+.sidebar-nav .nav-section { color: #64748b !important; }
 /* Teacher mode: light background for main content */
-body { background: #f1f5f9 !important; }
-.main-content { background: #f1f5f9; }
+body { background: #f1f5f9 !important; color: #1e293b !important; }
+.main-content { background: #f1f5f9 !important; }
 <?php endif; ?>
 </style>
 <nav class="sidebar">
