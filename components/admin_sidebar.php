@@ -89,8 +89,9 @@ $currentPage = basename($_SERVER['PHP_SELF']);
         </a>
         
         <div class="nav-section mt-4">Account</div>
-        <a href="api/auth/logout.php">
+        <a href="#" onclick="document.getElementById('logout-form').submit(); return false;">
             <i class="bi bi-box-arrow-right"></i> Logout
         </a>
     </div>
 </nav>
+<form id="logout-form" action="api/auth/logout.php" method="POST" style="display:none;"></form>
