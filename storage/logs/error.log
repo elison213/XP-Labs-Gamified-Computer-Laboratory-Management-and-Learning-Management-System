@@ -62,3 +62,10 @@ Stack trace:
 [03-Apr-2026 15:43:53 Asia/Manila] saveFloorLayout error: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '300-A-8' for key 'unique_position'
 [03-Apr-2026 15:46:45 Asia/Manila] saveFloorLayout: floorId=300, gridCols=8, gridRows=7, result=1
 [03-Apr-2026 15:46:47 Asia/Manila] saveFloorLayout: floorId=300, gridCols=8, gridRows=7, result=0
+[03-Apr-2026 16:56:03 Asia/Manila] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'a.is_pinned' in 'order clause' in C:\xampp\htdocs\xplabs\lib\Database.php:58
+Stack trace:
+#0 C:\xampp\htdocs\xplabs\lib\Database.php(58): PDO->prepare('SELECT a.*, u.f...')
+#1 C:\xampp\htdocs\xplabs\lib\Database.php(77): XPLabs\Lib\Database->query('SELECT a.*, u.f...', Array)
+#2 C:\xampp\htdocs\xplabs\announcements.php(45): XPLabs\Lib\Database->fetchAll('SELECT a.*, u.f...')
+#3 {main}
+  thrown in C:\xampp\htdocs\xplabs\lib\Database.php on line 58
