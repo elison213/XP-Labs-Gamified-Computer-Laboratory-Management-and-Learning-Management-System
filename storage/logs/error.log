@@ -190,3 +190,10 @@ Stack trace:
 #2 C:\xampp\htdocs\xplabs\assignments.php(36): XPLabs\Lib\Database->fetchAll('SELECT a.*, c.n...', Array)
 #3 {main}
   thrown in C:\xampp\htdocs\xplabs\lib\Database.php on line 58
+[03-Apr-2026 21:15:54 Asia/Manila] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 's.grade' in 'field list' in C:\xampp\htdocs\xplabs\lib\Database.php:58
+Stack trace:
+#0 C:\xampp\htdocs\xplabs\lib\Database.php(58): PDO->prepare('SELECT a.*, c.n...')
+#1 C:\xampp\htdocs\xplabs\lib\Database.php(77): XPLabs\Lib\Database->query('SELECT a.*, c.n...', Array)
+#2 C:\xampp\htdocs\xplabs\assignments.php(36): XPLabs\Lib\Database->fetchAll('SELECT a.*, c.n...', Array)
+#3 {main}
+  thrown in C:\xampp\htdocs\xplabs\lib\Database.php on line 58

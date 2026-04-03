@@ -15,7 +15,7 @@ $db = Database::getInstance();
 // Get assignments for courses the student is enrolled in
 $assignments = $db->fetchAll(
     "SELECT a.*, c.name as course_name, c.code as course_code,
-            s.id as submission_id, s.status as submission_status, s.grade, s.submitted_at,
+            s.id as submission_id, s.status as submission_status, s.score as grade, s.submitted_at,
             CASE 
                 WHEN s.id IS NOT NULL THEN 'submitted'
                 WHEN a.due_date < NOW() THEN 'overdue'
