@@ -89,32 +89,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         :root {
-            --bg-main: #f1f5f9; --bg-card: #ffffff; --border: #e2e8f0;
-            --text: #1e293b; --text-muted: #64748b; --accent: #6366f1;
+            --bg-main: #0f172a; --bg-card: #1e293b; --border: #334155;
+            --text: #e2e8f0; --text-muted: #94a3b8; --accent: #6366f1;
             --green: #22c55e; --yellow: #eab308; --red: #ef4444;
         }
         body { background: var(--bg-main); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
-        <?php if (($_SESSION['user_role'] ?? 'admin') === 'teacher'): ?>
-        body { background: #f1f5f9 !important; }
-        .main-content { background: #f1f5f9; }
-        .xp-card { background: #fff; border-color: #e2e8f0; }
-        .xp-card .card-header { background: #fff; border-color: #e2e8f0; }
-        .xp-card .card-header h5 { color: #1e293b; }
-        .xp-table th { color: #64748b; }
-        .xp-table td { color: #1e293b; border-color: #e2e8f0; }
-        .form-control, .form-select { background: #fff; border-color: #e2e8f0; color: #1e293b; }
-        .form-label { color: #64748b; }
-        .text-muted { color: #64748b !important; }
-        .text-white { color: #1e293b !important; }
-        .modal-content { background: #fff; }
-        .modal-header { border-color: #e2e8f0; }
-        .modal-footer { border-color: #e2e8f0; }
-        .stat-card { background: #fff; border-color: #e2e8f0; }
-        .stat-card .value { color: #1e293b; }
-        .stat-card .label { color: #64748b; }
-        .profile-section { background: #fff; border-color: #e2e8f0; }
-        .achievement-badge { background: #fff; border-color: #e2e8f0; }
-        <?php endif; ?>
         .sidebar { position: fixed; top: 0; left: 0; width: 260px; height: 100vh; background: var(--bg-card); border-right: 1px solid var(--border); z-index: 1000; overflow-y: auto; }
         .sidebar-brand { padding: 1.5rem; border-bottom: 1px solid var(--border); }
         .sidebar-brand h4 { margin: 0; font-weight: 700; color: var(--text); }
@@ -132,27 +111,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
         .form-control, .form-select { background: var(--bg-main); border: 1px solid var(--border); color: var(--text); }
         .form-control:focus, .form-select:focus { border-color: var(--accent); box-shadow: 0 0 0 0.2rem rgba(99, 102, 241, 0.25); }
         .form-label { color: var(--text-muted); font-size: 0.85rem; }
-        .profile-avatar { width: 100px; height: 100px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), #8b5cf6); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; color: var(--text); margin: 0 auto 1rem; }
+        .profile-avatar { width: 100px; height: 100px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), #8b5cf6); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; color: #fff; margin: 0 auto 1rem; }
         .stat-box { background: var(--bg-main); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; text-align: center; }
         .stat-box .value { font-size: 1.5rem; font-weight: 700; color: var(--text); }
         .stat-box .label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; }
         .achievement-icon { width: 50px; height: 50px; border-radius: 50%; background: var(--bg-main); border: 2px solid var(--accent); display: inline-flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-right: 0.5rem; }
         .activity-item { padding: 0.75rem 0; border-bottom: 1px solid var(--border); }
         .activity-item:last-child { border-bottom: none; }
+        .text-muted { color: var(--text-muted) !important; }
     </style>
 </head>
 <body>
-    <nav class="sidebar">
-        <div class="sidebar-brand"><h4><i class="bi bi-flask me-2"></i>XPLabs</h4><small><?= ucfirst($role) ?> Portal</small></div>
-        <div class="sidebar-nav">
-            <a href="dashboard_<?= $role === 'student' ? 'student' : ($role === 'admin' ? 'admin' : 'teacher') ?>.php"><i class="bi bi-grid-1x2"></i> Dashboard</a>
-            <a href="announcements.php"><i class="bi bi-megaphone"></i> Announcements</a>
-            <a href="leaderboard.php"><i class="bi bi-trophy"></i> Leaderboard</a>
-            <div class="nav-section mt-4">Account</div>
-            <a href="profile_student.php" class="active"><i class="bi bi-person"></i> My Profile</a>
-            <a href="api/auth/logout.php"><i class="bi bi-box-arrow-right"></i> Logout</a>
-        </div>
-    </nav>
+    <?php include __DIR__ . '/components/student_sidebar.php'; ?>
 
     <div class="main-content">
         <h2 class="mb-4"><i class="bi bi-person me-2"></i>My Profile</h2>

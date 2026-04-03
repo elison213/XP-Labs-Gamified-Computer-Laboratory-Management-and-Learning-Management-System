@@ -50,11 +50,11 @@ $averageGrade = $gradedAssignments > 0 ? round($totalPoints / $gradedAssignments
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         :root {
-            --bg-main: #f1f5f9;
-            --bg-card: #ffffff;
-            --border: #e2e8f0;
-            --text: #1e293b;
-            --text-muted: #64748b;
+            --bg-main: #0f172a;
+            --bg-card: #1e293b;
+            --border: #334155;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
             --accent: #6366f1;
             --green: #22c55e;
             --yellow: #eab308;
@@ -123,9 +123,9 @@ $averageGrade = $gradedAssignments > 0 ? round($totalPoints / $gradedAssignments
             padding: 0.25rem 0.75rem; border-radius: 20px;
             font-size: 0.75rem; font-weight: 600;
         }
-        .status-pill.submitted { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
-        .status-pill.graded { background: rgba(34, 197, 94, 0.1); color: var(--green); }
-        .status-pill.late { background: rgba(234, 179, 8, 0.1); color: var(--yellow); }
+        .status-pill.submitted { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+        .status-pill.graded { background: rgba(34, 197, 94, 0.2); color: var(--green); }
+        .status-pill.late { background: rgba(234, 179, 8, 0.2); color: var(--yellow); }
 
         .grade-badge {
             display: inline-block; padding: 0.25rem 0.5rem;
@@ -139,6 +139,7 @@ $averageGrade = $gradedAssignments > 0 ? round($totalPoints / $gradedAssignments
             background: var(--bg-main); border: 1px solid var(--border);
             border-radius: 6px; padding: 0.75rem; margin-top: 0.5rem;
         }
+        .text-muted { color: var(--text-muted) !important; }
     </style>
 </head>
 <body>

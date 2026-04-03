@@ -59,11 +59,11 @@ foreach ($assignments as $a) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         :root {
-            --bg-main: #f1f5f9;
-            --bg-card: #ffffff;
-            --border: #e2e8f0;
-            --text: #1e293b;
-            --text-muted: #64748b;
+            --bg-main: #0f172a;
+            --bg-card: #1e293b;
+            --border: #334155;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
             --accent: #6366f1;
             --green: #22c55e;
             --yellow: #eab308;
@@ -126,19 +126,20 @@ foreach ($assignments as $a) {
             border-radius: 8px; padding: 1.25rem; margin-bottom: 1rem;
             transition: all 0.2s;
         }
-        .assignment-card:hover { border-color: var(--accent); box-shadow: 0 2px 8px rgba(99, 102, 241, 0.1); }
+        .assignment-card:hover { border-color: var(--accent); box-shadow: 0 2px 8px rgba(99, 102, 241, 0.2); }
         
         .status-badge {
             padding: 0.25rem 0.75rem; border-radius: 20px;
             font-size: 0.75rem; font-weight: 600;
         }
-        .status-badge.pending { background: rgba(99, 102, 241, 0.1); color: var(--accent); }
-        .status-badge.submitted { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
-        .status-badge.graded { background: rgba(34, 197, 94, 0.1); color: var(--green); }
-        .status-badge.overdue { background: rgba(239, 68, 68, 0.1); color: var(--red); }
+        .status-badge.pending { background: rgba(99, 102, 241, 0.2); color: var(--accent); }
+        .status-badge.submitted { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+        .status-badge.graded { background: rgba(34, 197, 94, 0.2); color: var(--green); }
+        .status-badge.overdue { background: rgba(239, 68, 68, 0.2); color: var(--red); }
 
         .due-date { font-size: 0.85rem; color: var(--text-muted); }
         .course-label { font-size: 0.75rem; color: var(--text-muted); }
+        .text-muted { color: var(--text-muted) !important; }
     </style>
 </head>
 <body>
