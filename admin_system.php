@@ -125,61 +125,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         :root {
-            --bg-dark: #0f172a;
-            --bg-card: #1e293b;
-            --border: #334155;
-            --text: #e2e8f0;
-            --text-muted: #94a3b8;
+            --bg-main: #f1f5f9;
+            --bg-card: #ffffff;
+            --border: #e2e8f0;
+            --text: #1e293b;
+            --text-muted: #64748b;
             --accent: #6366f1;
             --green: #22c55e;
             --yellow: #eab308;
             --red: #ef4444;
-            --gray: #64748b;
+            --gray: #94a3b8;
         }
         
         body {
-            background: var(--bg-dark);
+            background: var(--bg-main);
             color: var(--text);
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
             min-height: 100vh;
-        }
-        <?php if (($_SESSION['user_role'] ?? 'admin') === 'teacher'): ?>
-        body { background: #f1f5f9 !important; }
-        .main-content { background: #f1f5f9; }
-        .xp-card { background: #fff; border-color: #e2e8f0; }
-        .xp-card .card-header { background: #fff; border-color: #e2e8f0; }
-        .xp-card .card-header h5 { color: #1e293b; }
-        .form-control, .form-select { background: #fff; border-color: #e2e8f0; color: #1e293b; }
-        .form-label { color: #64748b; }
-        .text-muted { color: #64748b !important; }
-        .text-white { color: #1e293b !important; }
-        .modal-content { background: #fff; }
-        .modal-header { border-color: #e2e8f0; }
-        .modal-footer { border-color: #e2e8f0; }
-        <?php endif; ?>
-
-        .sidebar {
-            position: fixed; top: 0; left: 0; width: 260px; height: 100vh;
-            background: var(--bg-card); border-right: 1px solid var(--border);
-            z-index: 1000; overflow-y: auto;
-        }
-        .sidebar-brand { padding: 1.5rem; border-bottom: 1px solid var(--border); }
-        .sidebar-brand h4 { margin: 0; font-weight: 700; color: #fff; }
-        .sidebar-brand small { color: var(--text-muted); }
-        .sidebar-nav { padding: 1rem 0; }
-        .sidebar-nav a {
-            display: flex; align-items: center; gap: 0.75rem;
-            padding: 0.75rem 1.5rem; color: var(--text-muted);
-            text-decoration: none; transition: all 0.2s;
-        }
-        .sidebar-nav a:hover, .sidebar-nav a.active {
-            background: rgba(99, 102, 241, 0.1); color: var(--accent);
-        }
-        .sidebar-nav a i { width: 20px; text-align: center; }
-        .sidebar-nav .nav-section {
-            padding: 0.5rem 1.5rem; font-size: 0.7rem;
-            text-transform: uppercase; letter-spacing: 0.05em;
-            color: var(--text-muted); margin-top: 0.5rem;
         }
 
         .main-content { margin-left: 260px; padding: 2rem; }
@@ -192,14 +154,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
             background: transparent; border-bottom: 1px solid var(--border);
             padding: 1rem 1.5rem;
         }
-        .xp-card .card-header h5 { margin: 0; font-weight: 600; color: #fff; }
+        .xp-card .card-header h5 { margin: 0; font-weight: 600; color: var(--text); }
         .xp-card .card-body { padding: 1.5rem; }
 
         .stat-box {
-            background: var(--bg-dark); border: 1px solid var(--border);
+            background: var(--bg-card); border: 1px solid var(--border);
             border-radius: 8px; padding: 1rem; text-align: center;
         }
-        .stat-box .value { font-size: 1.5rem; font-weight: 700; color: #fff; }
+        .stat-box .value { font-size: 1.5rem; font-weight: 700; color: var(--text); }
         .stat-box .label { font-size: 0.75rem; color: var(--text-muted); }
 
         .xp-table { width: 100%; border-collapse: collapse; }
@@ -232,12 +194,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
         }
         .lab-tab:hover { border-color: var(--accent); color: var(--text); }
         .lab-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-        .lab-tab .badge { font-size: 0.65rem; background: rgba(255,255,255,0.2); }
+        .lab-tab .badge { font-size: 0.65rem; background: rgba(99,102,241,0.2); color: var(--accent); }
 
         .floor-tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
         .floor-tab {
             padding: 0.5rem 1.25rem; border-radius: 6px;
-            background: var(--bg-dark); border: 1px solid var(--border);
+            background: var(--bg-card); border: 1px solid var(--border);
             color: var(--text-muted); text-decoration: none;
             transition: all 0.2s;
         }
@@ -245,7 +207,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
         .floor-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
         .form-control, .form-select {
-            background: var(--bg-dark); border: 1px solid var(--border);
+            background: var(--bg-card); border: 1px solid var(--border);
             color: var(--text);
         }
         .form-control:focus, .form-select:focus {
@@ -413,7 +375,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
                 </div>
             </div>
             <?php if (!empty($stations)): ?>
-            <div class="card-footer" style="background: var(--bg-dark); border-top: 1px solid var(--border);">
+            <div class="card-footer" style="background: var(--bg-card); border-top: 1px solid var(--border);">
                 <form method="POST" class="d-flex gap-2 align-items-center">
                     <?= csrf_field() ?>
                     <input type="hidden" name="action" value="bulk_status">
