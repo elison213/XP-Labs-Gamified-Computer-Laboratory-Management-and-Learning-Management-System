@@ -10,6 +10,45 @@ use XPLabs\Lib\Database;
 Auth::require();
 
 $db = Database::getInstance();
+
+// Handle CSV export
+if (isset($_GET['export']) && $_GET['export'] === 'csv') {
+    header('Content-Type: text/csv');
+    header('Content-Disposition: attachment; filename="attendance_' . date('Y-m-d') . '.csv"');
+    $out = fopen('php://output', 'w');
+    fputcsv($out, ['Student', 'LRN', 'Lab', 'Station', 'Check In', 'Check Out', 'Duration (min)', 'Status']);
+    
+    $exportRecords = $db->fetchAll(
+        "SELECT sa.*, u.lrn, u.first_name, u.last_name, 
+                ls.station_code, lf.name as floor_name, l.name as lab_name
+         FROM station_assignments sa
+         JOIN users u ON sa.user_id = u.id
+         JOIN lab_stations ls ON sa.station_id = ls.id
+         JOIN lab_floors lf ON ls.floor_id = lf.id
+         LEFT JOIN labs l ON lf.lab_id = l.id
+         WHERE $whereClause
+         ORDER BY sa.check_in_time DESC
+         LIMIT 5000",
+        $params
+    );
+    foreach ($exportRecords as $r) {
+        $checkIn = strtotime($r['check_in_time']);
+        $checkOut = $r['check_out_time'] ? strtotime($r['check_out_time']) : null;
+        $durationMin = $checkOut ? round(($checkOut - $checkIn) / 60) : round((time() - $checkIn) / 60);
+        fputcsv($out, [
+            $r['first_name'] . ' ' . $r['last_name'],
+            $r['lrn'],
+            $r['lab_name'] ?? $r['floor_name'],
+            $r['station_code'],
+            date('Y-m-d H:i', $checkIn),
+            $checkOut ? date('Y-m-d H:i', $checkOut) : '',
+            $durationMin,
+            !$checkOut ? 'Active' : 'Completed'
+        ]);
+    }
+    fclose($out);
+    exit;
+}
 $role = $_SESSION['user_role'];
 $userId = Auth::id();
 
@@ -210,6 +249,9 @@ $stats = $db->fetch(
                 <h2 class="mb-1"><i class="bi bi-calendar-check me-2"></i>Attendance History</h2>
                 <p class="text-muted mb-0">Track lab session attendance</p>
             </div>
+            <a href="?<?= http_build_query(array_merge($_GET, ['export' => 'csv'])) ?>" class="btn btn-success">
+                <i class="bi bi-file-earmark-spreadsheet me-1"></i> Export CSV
+            </a>
         </div>
 
         <!-- Stats -->
