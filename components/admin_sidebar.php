@@ -1,10 +1,10 @@
 <?php
 /**
  * XPLabs - Role-Aware Sidebar Component
- * Usage: Include this file after $role is defined
+ * Usage: Include this file after Auth is initialized
  * Teachers see limited navigation, Admins see full navigation
  */
-$currentRole = $role ?? 'admin';
+$currentRole = $role ?? ($_SESSION['user_role'] ?? 'admin');
 $currentPage = basename($_SERVER['PHP_SELF']);
 $isTeacher = ($currentRole === 'teacher');
 ?>
@@ -32,6 +32,11 @@ $isTeacher = ($currentRole === 'teacher');
     text-transform: uppercase; letter-spacing: 0.05em;
     color: var(--text-muted, #94a3b8); margin-top: 0.5rem;
 }
+<?php if ($isTeacher): ?>
+/* Teacher mode: light background for main content */
+body { background: #f1f5f9 !important; }
+.main-content { background: #f1f5f9; }
+<?php endif; ?>
 </style>
 <nav class="sidebar">
     <div class="sidebar-brand">
@@ -80,6 +85,14 @@ $isTeacher = ($currentRole === 'teacher');
         </a>
         <a href="attendance_history.php" class="<?= $currentPage === 'attendance_history.php' ? 'active' : '' ?>">
             <i class="bi bi-calendar-check"></i> Attendance
+        </a>
+        
+        <div class="nav-section">Analytics</div>
+        <a href="analytics.php" class="<?= $currentPage === 'analytics.php' ? 'active' : '' ?>">
+            <i class="bi bi-graph-up"></i> Analytics
+        </a>
+        <a href="award_points.php" class="<?= $currentPage === 'award_points.php' ? 'active' : '' ?>">
+            <i class="bi bi-award"></i> Award Points
         </a>
         
         <div class="nav-section">Gamification</div>
