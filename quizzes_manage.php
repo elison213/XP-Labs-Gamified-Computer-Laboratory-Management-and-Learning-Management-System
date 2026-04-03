@@ -39,7 +39,7 @@ $courseFilter = (int) ($_GET['course_id'] ?? 0);
 $statusFilter = $_GET['status'] ?? '';
 
 // Get courses
-$courses = $db->fetchAll("SELECT * FROM courses WHERE is_active = 1 ORDER BY name ASC");
+$courses = $db->fetchAll("SELECT * FROM courses WHERE status != 'archived' ORDER BY name ASC");
 
 // Get quizzes
 $where = ['1=1'];

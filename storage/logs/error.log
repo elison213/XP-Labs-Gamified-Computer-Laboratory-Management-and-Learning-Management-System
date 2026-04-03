@@ -139,3 +139,17 @@ Stack trace:
 #2 C:\xampp\htdocs\xplabs\attendance_history.php(94): XPLabs\Lib\Database->fetchAll('SELECT sa.*, u....', Array)
 #3 {main}
   thrown in C:\xampp\htdocs\xplabs\lib\Database.php on line 58
+[03-Apr-2026 17:33:32 Asia/Manila] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'is_active' in 'where clause' in C:\xampp\htdocs\xplabs\lib\Database.php:58
+Stack trace:
+#0 C:\xampp\htdocs\xplabs\lib\Database.php(58): PDO->prepare('SELECT * FROM c...')
+#1 C:\xampp\htdocs\xplabs\lib\Database.php(77): XPLabs\Lib\Database->query('SELECT * FROM c...', Array)
+#2 C:\xampp\htdocs\xplabs\quizzes_manage.php(42): XPLabs\Lib\Database->fetchAll('SELECT * FROM c...')
+#3 {main}
+  thrown in C:\xampp\htdocs\xplabs\lib\Database.php on line 58
+[03-Apr-2026 17:33:37 Asia/Manila] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'is_active' in 'where clause' in C:\xampp\htdocs\xplabs\lib\Database.php:58
+Stack trace:
+#0 C:\xampp\htdocs\xplabs\lib\Database.php(58): PDO->prepare('SELECT * FROM c...')
+#1 C:\xampp\htdocs\xplabs\lib\Database.php(77): XPLabs\Lib\Database->query('SELECT * FROM c...', Array)
+#2 C:\xampp\htdocs\xplabs\quizzes_manage.php(42): XPLabs\Lib\Database->fetchAll('SELECT * FROM c...')
+#3 {main}
+  thrown in C:\xampp\htdocs\xplabs\lib\Database.php on line 58
