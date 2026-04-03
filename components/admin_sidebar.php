@@ -6,6 +6,31 @@
 $currentRole = $role ?? 'admin';
 $currentPage = basename($_SERVER['PHP_SELF']);
 ?>
+<style>
+.sidebar {
+    position: fixed; top: 0; left: 0; width: 260px; height: 100vh;
+    background: var(--bg-card, #1e293b); border-right: 1px solid var(--border, #334155);
+    z-index: 1000; overflow-y: auto;
+}
+.sidebar-brand { padding: 1.5rem; border-bottom: 1px solid var(--border, #334155); }
+.sidebar-brand h4 { margin: 0; font-weight: 700; color: #fff; }
+.sidebar-brand small { color: var(--text-muted, #94a3b8); }
+.sidebar-nav { padding: 1rem 0; }
+.sidebar-nav a {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.75rem 1.5rem; color: var(--text-muted, #94a3b8);
+    text-decoration: none; transition: all 0.2s;
+}
+.sidebar-nav a:hover, .sidebar-nav a.active {
+    background: rgba(99, 102, 241, 0.1); color: var(--accent, #6366f1);
+}
+.sidebar-nav a i { width: 20px; text-align: center; }
+.sidebar-nav .nav-section {
+    padding: 0.5rem 1.5rem; font-size: 0.7rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--text-muted, #94a3b8); margin-top: 0.5rem;
+}
+</style>
 <nav class="sidebar">
     <div class="sidebar-brand">
         <h4><i class="bi bi-flask me-2"></i>XPLabs</h4>
