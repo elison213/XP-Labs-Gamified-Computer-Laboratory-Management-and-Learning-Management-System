@@ -38,8 +38,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
             if ($layout && $currentFloorId) {
                 $labService->saveFloorLayout($currentFloorId, $layout);
                 $message = ['type' => 'success', 'text' => 'Layout saved successfully'];
-                // Refresh
+                // Refresh ALL data including floor grid settings
+                $currentFloor = $labService->getFloor($currentFloorId);
                 $stations = $labService->getStations();
+                $floors = $labService->getFloors();
                 $stationsByFloor = [];
                 foreach ($stations as $s) {
                     $fid = $s['floor_id'] ?? 0;
