@@ -83,7 +83,7 @@ $assignments = $db->fetchAll(
     "SELECT a.*, c.name as course_name 
      FROM assignments a 
      LEFT JOIN courses c ON a.course_id = c.id 
-     WHERE a.is_active = 1 
+     WHERE a.status != 'archived'
      ORDER BY a.created_at DESC"
 );
 
