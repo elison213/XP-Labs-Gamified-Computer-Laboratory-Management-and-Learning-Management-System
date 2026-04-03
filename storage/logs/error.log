@@ -76,3 +76,24 @@ Stack trace:
 #2 C:\xampp\htdocs\xplabs\leaderboard.php(18): XPLabs\Lib\Database->fetchAll('SELECT u.id, u....')
 #3 {main}
   thrown in C:\xampp\htdocs\xplabs\lib\Database.php on line 58
+[03-Apr-2026 17:04:55 Asia/Manila] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'upb.total_points' in 'field list' in C:\xampp\htdocs\xplabs\lib\Database.php:58
+Stack trace:
+#0 C:\xampp\htdocs\xplabs\lib\Database.php(58): PDO->prepare('SELECT u.id, u....')
+#1 C:\xampp\htdocs\xplabs\lib\Database.php(77): XPLabs\Lib\Database->query('SELECT u.id, u....', Array)
+#2 C:\xampp\htdocs\xplabs\leaderboard.php(18): XPLabs\Lib\Database->fetchAll('SELECT u.id, u....')
+#3 {main}
+  thrown in C:\xampp\htdocs\xplabs\lib\Database.php on line 58
+[03-Apr-2026 17:04:57 Asia/Manila] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'upb.total_points' in 'field list' in C:\xampp\htdocs\xplabs\lib\Database.php:58
+Stack trace:
+#0 C:\xampp\htdocs\xplabs\lib\Database.php(58): PDO->prepare('SELECT u.id, u....')
+#1 C:\xampp\htdocs\xplabs\lib\Database.php(77): XPLabs\Lib\Database->query('SELECT u.id, u....', Array)
+#2 C:\xampp\htdocs\xplabs\leaderboard.php(18): XPLabs\Lib\Database->fetchAll('SELECT u.id, u....')
+#3 {main}
+  thrown in C:\xampp\htdocs\xplabs\lib\Database.php on line 58
+[03-Apr-2026 17:04:59 Asia/Manila] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'upb.total_points' in 'field list' in C:\xampp\htdocs\xplabs\lib\Database.php:58
+Stack trace:
+#0 C:\xampp\htdocs\xplabs\lib\Database.php(58): PDO->prepare('SELECT u.id, u....')
+#1 C:\xampp\htdocs\xplabs\lib\Database.php(77): XPLabs\Lib\Database->query('SELECT u.id, u....', Array)
+#2 C:\xampp\htdocs\xplabs\leaderboard.php(18): XPLabs\Lib\Database->fetchAll('SELECT u.id, u....')
+#3 {main}
+  thrown in C:\xampp\htdocs\xplabs\lib\Database.php on line 58

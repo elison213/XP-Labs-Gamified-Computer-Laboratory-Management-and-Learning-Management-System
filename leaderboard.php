@@ -16,13 +16,8 @@ $userId = Auth::id();
 // Get leaderboard from user_point_balances
 $leaderboard = $db->fetchAll(
     "SELECT u.id, u.lrn, u.first_name, u.last_name,
-            COALESCE(upb.total_points, 0) as total_points,
-            COALESCE(upb.current_streak, 0) as current_streak,
-            COALESCE(upb.best_streak, 0) as best_streak,
-            COALESCE(upb.quizzes_taken, 0) as quizzes_taken,
-            COALESCE(upb.assignments_completed, 0) as assignments_completed,
-            COALESCE(upb.perfect_scores, 0) as perfect_scores,
-            COALESCE(upb.achievements_unlocked, 0) as achievements_unlocked
+            COALESCE(upb.total_earned, 0) as total_points,
+            COALESCE(upb.balance, 0) as balance
      FROM users u
      LEFT JOIN user_point_balances upb ON u.id = upb.user_id
      WHERE u.role = 'student'
@@ -31,17 +26,19 @@ $leaderboard = $db->fetchAll(
 );
 
 // Get current user's rank
-$userRank = $db->fetchOne(
-    "SELECT COUNT(*) + 1 as rank
-     FROM users u
-     LEFT JOIN user_point_balances upb ON u.id = upb.user_id
-     WHERE u.role = 'student' AND COALESCE(upb.total_points, 0) > (
-         SELECT COALESCE(upb2.total_points, 0) FROM users u2
-         LEFT JOIN user_point_balances upb2 ON u2.id = upb2.user_id
-         WHERE u2.id = ?
-     )",
+$userRank = $db->fetch(
+    "SELECT rank FROM (
+         SELECT u2.id, 
+                @row_num := @row_num + 1 as rank
+         FROM users u2
+         LEFT JOIN user_point_balances upb2 ON u2.id = upb2.user_id,
+         (SELECT @row_num := 0) r
+         WHERE u2.role = 'student'
+         ORDER BY COALESCE(upb2.total_earned, 0) DESC
+       ) ranked WHERE id = ?",
     [$userId]
 );
+$userRank = $userRank ? $userRank['rank'] : '-';
 
 // Get user's achievements
 $userAchievements = $db->fetchAll(
@@ -296,15 +293,12 @@ $userAchievements = $db->fetchAll(
                 <div class="table-responsive">
                     <table class="xp-table">
                         <thead>
-                            <tr>
-                                <th style="width: 60px">Rank</th>
-                                <th>Student</th>
-                                <th class="text-center">Points</th>
-                                <th class="text-center">Quizzes</th>
-                                <th class="text-center">Assignments</th>
-                                <th class="text-center">Perfect</th>
-                                <th class="text-center">Streak</th>
-                            </tr>
+<tr>
+    <th style="width: 60px">Rank</th>
+    <th>Student</th>
+    <th class="text-center">Total Points</th>
+    <th class="text-center">Balance</th>
+</tr>
                         </thead>
                         <tbody>
                             <?php foreach ($leaderboard as $i => $user): 
@@ -321,21 +315,12 @@ $userAchievements = $db->fetchAll(
                                     <?php endif; ?>
                                 </td>
                                 <td class="text-center fw-bold"><?= number_format($user['total_points']) ?></td>
-                                <td class="text-center"><?= $user['quizzes_taken'] ?></td>
-                                <td class="text-center"><?= $user['assignments_completed'] ?></td>
-                                <td class="text-center"><?= $user['perfect_scores'] ?></td>
-                                <td class="text-center">
-                                    <?php if ($user['current_streak'] > 0): ?>
-                                    <span class="text-warning">🔥 <?= $user['current_streak'] ?></span>
-                                    <?php else: ?>
-                                    <span class="text-muted">-</span>
-                                    <?php endif; ?>
-                                </td>
+                                <td class="text-center"><?= number_format($user['balance']) ?></td>
                             </tr>
                             <?php endforeach; ?>
                             <?php if (empty($leaderboard)): ?>
                             <tr>
-                                <td colspan="7" class="text-center text-muted py-4">
+                                <td colspan="4" class="text-center text-muted py-4">
                                     No rankings available yet
                                 </td>
                             </tr>
