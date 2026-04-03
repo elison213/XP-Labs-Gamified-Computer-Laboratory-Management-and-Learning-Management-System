@@ -455,7 +455,7 @@ $leaderboardPos = $db->fetchOne(
                         </div>
                         <?php endforeach; ?>
                         <?php if (empty($activeAssignments)): ?>
-                        <div class="text-center text-muted py-3">No active assignments</div>
+                        <div class="text-center py-3" style="color: var(--text-muted)">No active assignments</div>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -474,7 +474,7 @@ $leaderboardPos = $db->fetchOne(
                         </div>
                         <?php endforeach; ?>
                         <?php if (empty($recentPoints)): ?>
-                        <div class="text-center text-muted py-3">No points earned yet. Start attending classes and completing assignments!</div>
+                        <div class="text-center py-3" style="color: var(--text-muted)">No points earned yet. Start attending classes and completing assignments!</div>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -500,7 +500,7 @@ $leaderboardPos = $db->fetchOne(
                         </div>
                         <?php endforeach; ?>
                         <?php if (empty($achievements)): ?>
-                        <div class="text-center text-muted py-3">No achievements yet. Keep earning points!</div>
+                        <div class="text-center py-3" style="color: var(--text-muted)">No achievements yet. Keep earning points!</div>
                         <?php endif; ?>
                     </div>
                 </div>
