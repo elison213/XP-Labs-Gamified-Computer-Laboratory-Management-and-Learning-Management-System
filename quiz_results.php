@@ -124,24 +124,8 @@ $passCount = count(array_filter($attempts, fn($a) => ($a['score_percentage'] ?? 
     </style>
 </head>
 <body>
-    <nav class="sidebar">
-        <div class="sidebar-brand">
-            <h4><i class="bi bi-flask me-2"></i>XPLabs</h4>
-            <small><?= ucfirst($role) ?> Portal</small>
-        </div>
-        <div class="sidebar-nav">
-            <a href="quizzes_manage.php"><i class="bi bi-arrow-left me-1"></i> Back to Quizzes</a>
-            <a href="dashboard_<?= $role === 'admin' ? 'admin' : 'teacher' ?>.php"><i class="bi bi-grid-1x2"></i> Dashboard</a>
-            <div class="nav-section">Academic</div>
-            <a href="quizzes_manage.php" class="active"><i class="bi bi-question-circle"></i> Quizzes</a>
-            <a href="assignments_manage.php"><i class="bi bi-journal-text"></i> Assignments</a>
-            <a href="submissions.php"><i class="bi bi-upload"></i> Submissions</a>
-            <div class="nav-section mt-4">Account</div>
-            <a href="api/auth/logout.php"><i class="bi bi-box-arrow-right"></i> Logout</a>
-        </div>
-    </nav>
-
-    <div class="main-content">
+    <?php include __DIR__ . '/components/admin_sidebar.php'; ?>
+<div class="main-content">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
                 <h2 class="mb-1"><i class="bi bi-bar-chart me-2"></i>Quiz Results</h2>

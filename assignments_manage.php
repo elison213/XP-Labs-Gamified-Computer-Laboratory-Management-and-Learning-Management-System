@@ -168,38 +168,8 @@ $assignments = $db->fetchAll(
     </style>
 </head>
 <body>
-    <nav class="sidebar">
-        <div class="sidebar-brand">
-            <h4><i class="bi bi-flask me-2"></i>XPLabs</h4>
-            <small><?= ucfirst($role) ?> Portal</small>
-        </div>
-        <div class="sidebar-nav">
-            <a href="dashboard_<?= $role === 'admin' ? 'admin' : 'teacher' ?>.php">
-                <i class="bi bi-grid-1x2"></i> Dashboard
-            </a>
-            <a href="monitoring.php"><i class="bi bi-display"></i> Lab Monitor</a>
-            <a href="lab_seatplan.php"><i class="bi bi-layout-text-window-reverse"></i> Seat Plan</a>
-            
-            <div class="nav-section">Management</div>
-            <a href="admin_users.php"><i class="bi bi-people"></i> Users</a>
-            <a href="admin_system.php"><i class="bi bi-gear"></i> Lab Settings</a>
-            <a href="announcements.php"><i class="bi bi-megaphone"></i> Announcements</a>
-            
-            <div class="nav-section">Academic</div>
-            <a href="assignments_manage.php" class="active"><i class="bi bi-journal-text"></i> Assignments</a>
-            <a href="submissions.php"><i class="bi bi-upload"></i> Submissions</a>
-            <a href="attendance_history.php"><i class="bi bi-calendar-check"></i> Attendance</a>
-            
-            <div class="nav-section">Gamification</div>
-            <a href="leaderboard.php"><i class="bi bi-trophy"></i> Leaderboard</a>
-            <a href="admin_logs.php"><i class="bi bi-activity"></i> Activity Logs</a>
-            
-            <div class="nav-section mt-4">Account</div>
-            <a href="api/auth/logout.php"><i class="bi bi-box-arrow-right"></i> Logout</a>
-        </div>
-    </nav>
-
-    <div class="main-content">
+    <?php include __DIR__ . '/components/admin_sidebar.php'; ?>
+<div class="main-content">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
                 <h2 class="mb-1"><i class="bi bi-journal-text me-2"></i>Manage Assignments</h2>

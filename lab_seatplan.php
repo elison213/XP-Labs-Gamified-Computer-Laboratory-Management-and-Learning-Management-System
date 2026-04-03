@@ -292,28 +292,8 @@ $gridRows = $currentFloor['grid_rows'] ?? 5;
 </head>
 <body>
     <!-- Sidebar -->
-    <nav class="sidebar">
-        <div class="sidebar-brand">
-            <h4><i class="bi bi-flask me-2"></i>XPLabs</h4>
-            <small>Seat Plan Editor</small>
-        </div>
-        <div class="sidebar-nav">
-            <a href="<?= $_SESSION['user_role'] === 'admin' ? 'dashboard_admin.php' : 'dashboard_teacher.php' ?>">
-                <i class="bi bi-grid-1x2"></i> Dashboard
-            </a>
-            <a href="monitoring.php"><i class="bi bi-display"></i> Lab Monitor</a>
-            <a href="lab_seatplan.php" class="active"><i class="bi bi-layout-text-window-reverse"></i> Seat Plan</a>
-            
-            <div class="nav-section">Management</div>
-            <a href="admin_users.php"><i class="bi bi-people"></i> Users</a>
-            <a href="admin_system.php"><i class="bi bi-gear"></i> Lab Settings</a>
-            
-            <div class="nav-section mt-4">Account</div>
-            <a href="api/auth/logout.php"><i class="bi bi-box-arrow-right"></i> Logout</a>
-        </div>
-    </nav>
-
-    <!-- Main -->
+    <?php include __DIR__ . '/components/admin_sidebar.php'; ?>
+<!-- Main -->
     <div class="main-content">
         <!-- Header -->
         <div class="d-flex justify-content-between align-items-center mb-4">
