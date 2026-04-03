@@ -1,10 +1,12 @@
 <?php
 /**
- * XPLabs - Admin/Teacher Sidebar Component
+ * XPLabs - Role-Aware Sidebar Component
  * Usage: Include this file after $role is defined
+ * Teachers see limited navigation, Admins see full navigation
  */
 $currentRole = $role ?? 'admin';
 $currentPage = basename($_SERVER['PHP_SELF']);
+$isTeacher = ($currentRole === 'teacher');
 ?>
 <style>
 .sidebar {
@@ -47,6 +49,7 @@ $currentPage = basename($_SERVER['PHP_SELF']);
             <i class="bi bi-layout-text-window-reverse"></i> Seat Plan
         </a>
         
+        <?php if (!$isTeacher): ?>
         <div class="nav-section">Management</div>
         <a href="admin_users.php" class="<?= $currentPage === 'admin_users.php' ? 'active' : '' ?>">
             <i class="bi bi-people"></i> Users
@@ -63,6 +66,7 @@ $currentPage = basename($_SERVER['PHP_SELF']);
         <a href="announcements.php" class="<?= $currentPage === 'announcements.php' ? 'active' : '' ?>">
             <i class="bi bi-megaphone"></i> Announcements
         </a>
+        <?php endif; ?>
         
         <div class="nav-section">Academic</div>
         <a href="assignments_manage.php" class="<?= $currentPage === 'assignments_manage.php' ? 'active' : '' ?>">
@@ -83,10 +87,12 @@ $currentPage = basename($_SERVER['PHP_SELF']);
             <i class="bi bi-trophy"></i> Leaderboard
         </a>
         
+        <?php if (!$isTeacher): ?>
         <div class="nav-section">System</div>
         <a href="admin_logs.php" class="<?= $currentPage === 'admin_logs.php' ? 'active' : '' ?>">
             <i class="bi bi-activity"></i> Activity Logs
         </a>
+        <?php endif; ?>
         
         <div class="nav-section mt-4">Account</div>
         <a href="#" onclick="document.getElementById('logout-form').submit(); return false;">

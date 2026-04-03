@@ -12,6 +12,8 @@ use XPLabs\Services\QuizService;
 
 Auth::requireRole('teacher');
 
+$role = 'teacher';
+
 $userId = Auth::id();
 $db = Database::getInstance();
 $labService = new LabService();
@@ -71,13 +73,7 @@ $labStats = $labService->getStats();
     <style>
         :root { --xp-primary: #6366f1; --xp-dark: #1e293b; --xp-radius: 0.75rem; }
         body { background: #f1f5f9; }
-        .sidebar { position: fixed; top: 0; left: 0; width: 250px; height: 100vh; background: var(--xp-dark); color: #fff; padding: 1.5rem 0; z-index: 1000; }
-        .sidebar-brand { padding: 0 1.5rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 1rem; }
-        .sidebar-brand h4 { margin: 0; font-weight: 700; }
-        .sidebar a { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1.5rem; color: rgba(255,255,255,0.7); text-decoration: none; }
-        .sidebar a:hover, .sidebar a.active { background: rgba(255,255,255,0.1); color: #fff; }
-        .sidebar a .icon { width: 20px; text-align: center; }
-        .main-content { margin-left: 250px; padding: 2rem; }
+        .main-content { margin-left: 260px; padding: 2rem; }
         .stat-card { background: #fff; border-radius: var(--xp-radius); padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
         .course-card { background: #fff; border-radius: var(--xp-radius); padding: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: transform 0.2s; cursor: pointer; }
         .course-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
@@ -85,21 +81,7 @@ $labStats = $labService->getStats();
     </style>
 </head>
 <body>
-    <nav class="sidebar">
-        <div class="sidebar-brand">
-            <h4>🧪 XPLabs</h4>
-            <small>Teacher Panel</small>
-        </div>
-        <a href="dashboard_teacher.php" class="active"><span class="icon">📊</span> Dashboard</a>
-        <a href="monitoring.php"><span class="icon">🖥️</span> Lab Monitor</a>
-        <a href="attendance_history.php"><span class="icon">📋</span> Attendance</a>
-        <a href="assignments_manage.php"><span class="icon">📝</span> Assignments</a>
-        <a href="submissions.php"><span class="icon">📤</span> Submissions</a>
-        <a href="quizzes_manage.php"><span class="icon">❓</span> Quizzes</a>
-        <a href="leaderboard.php"><span class="icon">🏆</span> Leaderboard</a>
-        <hr class="border-secondary mx-3">
-        <a href="api/auth/logout.php"><span class="icon">🚪</span> Logout</a>
-    </nav>
+    <?php include __DIR__ . '/components/admin_sidebar.php'; ?>
 
     <div class="main-content">
         <div class="d-flex justify-content-between align-items-center mb-4">
