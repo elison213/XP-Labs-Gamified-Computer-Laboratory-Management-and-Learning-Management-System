@@ -77,6 +77,16 @@ if ($role === 'admin') {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
     <style>
+        <?php if (($_SESSION['user_role'] ?? 'admin') === 'student'): ?>
+        :root {
+            --bg-main: #0f172a;
+            --bg-card: #1e293b;
+            --border: #334155;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --accent: #6366f1;
+        }
+        <?php else: ?>
         :root {
             --bg-main: #f1f5f9;
             --bg-card: #ffffff;
@@ -85,6 +95,7 @@ if ($role === 'admin') {
             --text-muted: #64748b;
             --accent: #6366f1;
         }
+        <?php endif; ?>
         
         body {
             background: var(--bg-main);
@@ -105,6 +116,30 @@ if ($role === 'admin') {
         .modal-content { background: #fff; }
         .modal-header { border-color: #e2e8f0; }
         .modal-footer { border-color: #e2e8f0; }
+        <?php endif; ?>
+        <?php if (($_SESSION['user_role'] ?? 'admin') === 'student'): ?>
+        .main-content { background: var(--bg-main); }
+        .xp-card { background: var(--bg-card); border-color: var(--border); }
+        .xp-card .card-header { background: transparent; border-color: var(--border); }
+        .xp-card .card-header h5 { color: var(--text); }
+        .announcement-card { background: var(--bg-card); border-color: var(--border); }
+        .announcement-card .title { color: var(--text); }
+        .announcement-card .content { color: var(--text-muted); }
+        .announcement-card .meta { color: var(--text-muted); }
+        .text-muted { color: var(--text-muted) !important; }
+        .sidebar { background: var(--bg-card); border-color: var(--border); }
+        .sidebar-brand h4 { color: var(--text); }
+        .sidebar-brand small { color: var(--text-muted); }
+        .sidebar-nav a { color: var(--text-muted); }
+        .sidebar-nav a:hover, .sidebar-nav a.active { background: rgba(99, 102, 241, 0.1); color: var(--accent); }
+        .sidebar-nav .nav-section { color: var(--text-muted); }
+        .modal-content { background: var(--bg-card); border-color: var(--border); }
+        .modal-header { background: var(--bg-card); border-color: var(--border); }
+        .modal-header .modal-title { color: var(--text); }
+        .modal-body { color: var(--text); }
+        .modal-footer { border-color: var(--border); }
+        .form-control, .form-select { background: var(--bg-main); border-color: var(--border); color: var(--text); }
+        .form-label { color: var(--text-muted); }
         <?php endif; ?>
 
         .sidebar {
