@@ -59,15 +59,12 @@ if ($role === 'admin') {
     );
 } else {
     $announcements = $db->fetchAll(
-        "SELECT DISTINCT a.*, u.first_name, u.last_name
+        "SELECT a.*, u.first_name, u.last_name
          FROM announcements a
          LEFT JOIN users u ON a.created_by = u.id
-         LEFT JOIN course_announcements ca ON a.id = ca.announcement_id
-         LEFT JOIN course_enrollments ce ON ca.course_id = ce.course_id
          WHERE a.is_active = 1 
-           AND (a.target_audience = 'all' OR a.target_audience = 'students' OR ce.user_id = ?)
-         ORDER BY a.is_pinned DESC, a.created_at DESC",
-        [$userId]
+           AND (a.target_audience = 'all' OR a.target_audience = 'students')
+         ORDER BY a.is_pinned DESC, a.created_at DESC"
     );
 }
 ?>
@@ -168,7 +165,13 @@ if ($role === 'admin') {
     </style>
 </head>
 <body>
-    <?php include __DIR__ . '/components/admin_sidebar.php'; ?>
+    <?php 
+    if ($role === 'student') {
+        include __DIR__ . '/components/student_sidebar.php';
+    } else {
+        include __DIR__ . '/components/admin_sidebar.php';
+    }
+    ?>
 <div class="main-content">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>

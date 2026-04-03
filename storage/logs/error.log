@@ -169,3 +169,10 @@ Stack trace:
 #2 C:\xampp\htdocs\xplabs\dashboard_student.php(64): XPLabs\Lib\Database->fetchAll('SELECT q.*, c.n...')
 #3 {main}
   thrown in C:\xampp\htdocs\xplabs\lib\Database.php on line 58
+[03-Apr-2026 20:46:52 Asia/Manila] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'xplabs.course_announcements' doesn't exist in C:\xampp\htdocs\xplabs\lib\Database.php:58
+Stack trace:
+#0 C:\xampp\htdocs\xplabs\lib\Database.php(58): PDO->prepare('SELECT DISTINCT...')
+#1 C:\xampp\htdocs\xplabs\lib\Database.php(77): XPLabs\Lib\Database->query('SELECT DISTINCT...', Array)
+#2 C:\xampp\htdocs\xplabs\announcements.php(70): XPLabs\Lib\Database->fetchAll('SELECT DISTINCT...', Array)
+#3 {main}
+  thrown in C:\xampp\htdocs\xplabs\lib\Database.php on line 58
