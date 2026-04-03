@@ -123,7 +123,7 @@ class UserService
     /**
      * Import users from CSV data.
      */
-    public function importFromCsv(array $rows, array $columnMapping, int $importedBy): array
+    public function importFromCsv(array $rows, array $columnMapping, string $role = 'student', int $importedBy = 0): array
     {
         $results = ['success' => 0, 'duplicate' => 0, 'error' => 0, 'errors' => []];
 
@@ -151,7 +151,7 @@ class UserService
                     'first_name' => $firstName,
                     'last_name' => $lastName,
                     'email' => trim($row[$columnMapping['email']] ?? ''),
-                    'role' => 'student',
+                    'role' => $role,
                     'password' => $lrn, // Default password is LRN
                 ]);
                 $results['success']++;
@@ -159,6 +159,67 @@ class UserService
 
             $this->db->commit();
         } catch (\Exception $e) {
+            $this->db->rollback();
+            throw $e;
+        }
+
+        return $results;
+    }
+
+    /**
+     * Import users from uploaded CSV file.
+     */
+    public function importFromFile(string $filePath, string $role = 'student'): array
+    {
+        if (!file_exists($filePath)) {
+            throw new \Exception('File not found');
+        }
+
+        $handle = fopen($filePath, 'r');
+        if (!$handle) {
+            throw new \Exception('Cannot open file');
+        }
+
+        $results = ['success' => 0, 'duplicate' => 0, 'error' => 0, 'errors' => []];
+        $header = fgetcsv($handle); // Skip header row
+
+        $this->db->beginTransaction();
+        try {
+            $rowNum = 1;
+            while (($row = fgetcsv($handle)) !== false) {
+                $rowNum++;
+                $lrn = trim($row[0] ?? '');
+                $firstName = trim($row[1] ?? '');
+                $lastName = trim($row[2] ?? '');
+                $email = trim($row[3] ?? '');
+
+                if (empty($lrn) || empty($firstName) || empty($lastName)) {
+                    $results['error']++;
+                    $results['errors'][] = "Row $rowNum: Missing required fields";
+                    continue;
+                }
+
+                $existing = $this->findByLrn($lrn);
+                if ($existing) {
+                    $results['duplicate']++;
+                    continue;
+                }
+
+                $this->create([
+                    'lrn' => $lrn,
+                    'first_name' => $firstName,
+                    'last_name' => $lastName,
+                    'email' => $email ?: null,
+                    'role' => $role,
+                    'password' => $lrn,
+                ]);
+                $results['success']++;
+            }
+
+            fclose($handle);
+            $this->db->commit();
+        } catch (\Exception $e) {
+            fclose($handle);
             $this->db->rollback();
             throw $e;
         }

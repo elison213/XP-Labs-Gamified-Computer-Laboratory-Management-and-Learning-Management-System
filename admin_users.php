@@ -52,6 +52,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
                 $userService->delete((int) $_POST['user_id']);
                 $message = ['type' => 'success', 'text' => 'User deleted successfully'];
                 break;
+            case 'import':
+                if (isset($_FILES['csv_file']) && $_FILES['csv_file']['error'] === UPLOAD_ERR_OK) {
+                    $role = $_POST['role'] ?? 'student';
+                    $results = $userService->importFromFile($_FILES['csv_file']['tmp_name'], $role);
+                    $message = ['type' => 'success', 'text' => "Import complete: {$results['success']} added, {$results['duplicate']} duplicates, {$results['error']} errors"];
+                    if (!empty($results['errors'])) {
+                        $message['text'] .= '. Errors: ' . implode(', ', array_slice($results['errors'], 0, 5));
+                    }
+                } else {
+                    $message = ['type' => 'danger', 'text' => 'File upload error'];
+                }
+                break;
         }
     } catch (\Exception $e) {
         $message = ['type' => 'danger', 'text' => $e->getMessage()];
@@ -68,36 +80,151 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>User Management - XPLabs</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="<?= asset('css/lab-floor.css') ?>" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
     <style>
-        :root { --xp-dark: #1e293b; --xp-radius: 0.75rem; }
-        body { background: #f1f5f9; }
-        .sidebar { position: fixed; top: 0; left: 0; width: 250px; height: 100vh; background: var(--xp-dark); color: #fff; padding: 1.5rem 0; z-index: 1000; }
-        .sidebar-brand { padding: 0 1.5rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 1rem; }
-        .sidebar-brand h4 { margin: 0; font-weight: 700; }
-        .sidebar a { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1.5rem; color: rgba(255,255,255,0.7); text-decoration: none; }
-        .sidebar a:hover, .sidebar a.active { background: rgba(255,255,255,0.1); color: #fff; }
-        .sidebar a .icon { width: 20px; text-align: center; }
-        .main-content { margin-left: 250px; padding: 2rem; }
+        :root {
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --border: #334155;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --accent: #6366f1;
+            --green: #22c55e;
+            --yellow: #eab308;
+            --red: #ef4444;
+        }
+        
+        body {
+            background: var(--bg-dark);
+            color: var(--text);
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            position: fixed; top: 0; left: 0; width: 260px; height: 100vh;
+            background: var(--bg-card); border-right: 1px solid var(--border);
+            z-index: 1000; overflow-y: auto;
+        }
+        .sidebar-brand { padding: 1.5rem; border-bottom: 1px solid var(--border); }
+        .sidebar-brand h4 { margin: 0; font-weight: 700; color: #fff; }
+        .sidebar-brand small { color: var(--text-muted); }
+        .sidebar-nav { padding: 1rem 0; }
+        .sidebar-nav a {
+            display: flex; align-items: center; gap: 0.75rem;
+            padding: 0.75rem 1.5rem; color: var(--text-muted);
+            text-decoration: none; transition: all 0.2s;
+        }
+        .sidebar-nav a:hover, .sidebar-nav a.active {
+            background: rgba(99, 102, 241, 0.1); color: var(--accent);
+        }
+        .sidebar-nav a i { width: 20px; text-align: center; }
+        .sidebar-nav .nav-section {
+            padding: 0.5rem 1.5rem; font-size: 0.7rem;
+            text-transform: uppercase; letter-spacing: 0.05em;
+            color: var(--text-muted); margin-top: 0.5rem;
+        }
+
+        .main-content { margin-left: 260px; padding: 2rem; }
+
+        .xp-card {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 12px; overflow: hidden;
+        }
+        .xp-card .card-header {
+            background: transparent; border-bottom: 1px solid var(--border);
+            padding: 1rem 1.5rem;
+        }
+        .xp-card .card-header h5 { margin: 0; font-weight: 600; color: #fff; }
+        .xp-card .card-body { padding: 1.5rem; }
+
+        .xp-table { width: 100%; border-collapse: collapse; }
+        .xp-table th, .xp-table td {
+            padding: 0.75rem 1rem; text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        .xp-table th {
+            font-size: 0.75rem; text-transform: uppercase;
+            letter-spacing: 0.05em; color: var(--text-muted);
+            font-weight: 600;
+        }
+        .xp-table tr:hover { background: rgba(99, 102, 241, 0.05); }
+
+        .form-control, .form-select {
+            background: var(--bg-dark); border: 1px solid var(--border); color: var(--text);
+        }
+        .form-control:focus, .form-select:focus {
+            border-color: var(--accent); box-shadow: 0 0 0 0.2rem rgba(99, 102, 241, 0.25);
+        }
+        .form-label { color: var(--text-muted); font-size: 0.85rem; }
+
+        .role-badge {
+            padding: 0.25rem 0.5rem; border-radius: 4px;
+            font-size: 0.7rem; font-weight: 600;
+        }
+        .role-badge.admin { background: rgba(239, 68, 68, 0.1); color: var(--red); }
+        .role-badge.teacher { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+        .role-badge.student { background: rgba(99, 102, 241, 0.1); color: var(--accent); }
+
+        .status-badge {
+            padding: 0.25rem 0.5rem; border-radius: 4px;
+            font-size: 0.7rem; font-weight: 600;
+        }
+        .status-badge.active { background: rgba(34, 197, 94, 0.1); color: var(--green); }
+        .status-badge.inactive { background: rgba(100, 116, 139, 0.1); color: var(--text-muted); }
+
+        .pagination .page-link {
+            background: var(--bg-dark); border-color: var(--border); color: var(--text);
+        }
+        .pagination .page-item.active .page-link {
+            background: var(--accent); border-color: var(--accent);
+        }
     </style>
 </head>
 <body>
     <nav class="sidebar">
-        <div class="sidebar-brand"><h4>🧪 XPLabs</h4><small>Admin Panel</small></div>
-        <a href="dashboard_admin.php"><span class="icon">📊</span> Dashboard</a>
-        <a href="admin_users.php" class="active"><span class="icon">👥</span> Users</a>
-        <a href="admin_system.php"><span class="icon">🖥️</span> Lab Management</a>
-        <a href="admin_logs.php"><span class="icon">📋</span> Activity Logs</a>
-        <a href="announcements.php"><span class="icon">📢</span> Announcements</a>
-        <a href="leaderboard.php"><span class="icon">🏆</span> Leaderboard</a>
-        <hr class="border-secondary mx-3">
-        <a href="api/auth/logout.php"><span class="icon">🚪</span> Logout</a>
+        <div class="sidebar-brand">
+            <h4><i class="bi bi-flask me-2"></i>XPLabs</h4>
+            <small>Admin Control Panel</small>
+        </div>
+        <div class="sidebar-nav">
+            <a href="dashboard_admin.php"><i class="bi bi-grid-1x2"></i> Dashboard</a>
+            <a href="monitoring.php"><i class="bi bi-display"></i> Lab Monitor</a>
+            <a href="lab_seatplan.php"><i class="bi bi-layout-text-window-reverse"></i> Seat Plan</a>
+            
+            <div class="nav-section">Management</div>
+            <a href="admin_users.php" class="active"><i class="bi bi-people"></i> Users</a>
+            <a href="admin_system.php"><i class="bi bi-gear"></i> Lab Settings</a>
+            <a href="announcements.php"><i class="bi bi-megaphone"></i> Announcements</a>
+            
+            <div class="nav-section">Academic</div>
+            <a href="assignments_manage.php"><i class="bi bi-journal-text"></i> Assignments</a>
+            <a href="submissions.php"><i class="bi bi-upload"></i> Submissions</a>
+            <a href="attendance_history.php"><i class="bi bi-calendar-check"></i> Attendance</a>
+            
+            <div class="nav-section">Gamification</div>
+            <a href="leaderboard.php"><i class="bi bi-trophy"></i> Leaderboard</a>
+            <a href="admin_logs.php"><i class="bi bi-activity"></i> Activity Logs</a>
+            
+            <div class="nav-section mt-4">Account</div>
+            <a href="api/auth/logout.php"><i class="bi bi-box-arrow-right"></i> Logout</a>
+        </div>
     </nav>
 
     <div class="main-content">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 class="mb-0">👥 User Management</h2>
-            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalCreate">➕ Add User</button>
+            <div>
+                <h2 class="mb-1"><i class="bi bi-people me-2"></i>User Management</h2>
+                <p class="text-muted mb-0">Manage students, teachers, and admin accounts</p>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalCreate">
+                    <i class="bi bi-plus-lg me-1"></i> Add User
+                </button>
+                <button class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#modalImport">
+                    <i class="bi bi-upload me-1"></i> Import CSV
+                </button>
+            </div>
         </div>
 
         <?php if ($message): ?>
@@ -108,7 +235,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
         <?php endif; ?>
 
         <!-- Filters -->
-        <div class="card border-0 shadow-sm mb-4">
+        <div class="xp-card mb-4">
             <div class="card-body">
                 <form method="GET" class="row g-2">
                     <div class="col-md-4">
@@ -123,7 +250,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
                         </select>
                     </div>
                     <div class="col-md-2">
-                        <button type="submit" class="btn btn-primary w-100">🔍 Filter</button>
+                        <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search me-1"></i> Filter</button>
                     </div>
                     <div class="col-md-2">
                         <a href="admin_users.php" class="btn btn-outline-secondary w-100">Clear</a>
@@ -133,11 +260,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
         </div>
 
         <!-- Users Table -->
-        <div class="card border-0 shadow-sm">
+        <div class="xp-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-people me-2"></i>All Users</h5>
+                <span class="text-muted small"><?= $users['total'] ?? 0 ?> users</span>
+            </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover mb-0">
-                        <thead class="table-light">
+                    <table class="xp-table">
+                        <thead>
                             <tr>
                                 <th>LRN</th>
                                 <th>Name</th>
@@ -145,38 +276,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
                                 <th>Role</th>
                                 <th>Status</th>
                                 <th>Last Login</th>
-                                <th>Actions</th>
+                                <th class="text-end">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php foreach ($users['data'] as $user): ?>
                             <tr>
                                 <td><code><?= e($user['lrn']) ?></code></td>
-                                <td><?= e($user['first_name'] . ' ' . $user['last_name']) ?></td>
-                                <td><?= e($user['email'] ?? '—') ?></td>
-                                <td><span class="badge bg-<?= $user['role'] === 'admin' ? 'danger' : ($user['role'] === 'teacher' ? 'info' : 'primary') ?>"><?= ucfirst($user['role']) ?></span></td>
-                                <td><span class="badge bg-<?= $user['is_active'] ? 'success' : 'secondary' ?>"><?= $user['is_active'] ? 'Active' : 'Inactive' ?></span></td>
-                                <td><?= $user['last_login'] ? date('M j, Y H:i', strtotime($user['last_login'])) : 'Never' ?></td>
                                 <td>
-                                    <button class="btn btn-sm btn-outline-primary" onclick="editUser(<?= htmlspecialchars(json_encode($user)) ?>)">✏️ Edit</button>
+                                    <div class="fw-semibold"><?= e($user['first_name'] . ' ' . $user['last_name']) ?></div>
+                                </td>
+                                <td><?= e($user['email'] ?? '—') ?></td>
+                                <td><span class="role-badge <?= $user['role'] ?>"><?= ucfirst($user['role']) ?></span></td>
+                                <td><span class="status-badge <?= $user['is_active'] ? 'active' : 'inactive' ?>"><?= $user['is_active'] ? 'Active' : 'Inactive' ?></span></td>
+                                <td><?= $user['last_login'] ? date('M j, Y H:i', strtotime($user['last_login'])) : '<span class="text-muted">Never</span>' ?></td>
+                                <td class="text-end">
+                                    <button class="btn btn-sm btn-outline-primary" onclick="editUser(<?= htmlspecialchars(json_encode($user)) ?>)">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
                                     <form method="POST" class="d-inline" onsubmit="return confirm('Delete this user?')">
                                         <?= csrf_field() ?>
                                         <input type="hidden" name="action" value="delete">
                                         <input type="hidden" name="user_id" value="<?= $user['id'] ?>">
-                                        <button type="submit" class="btn btn-sm btn-outline-danger">🗑️</button>
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
                                     </form>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
                             <?php if (empty($users['data'])): ?>
-                            <tr><td colspan="7" class="text-center text-muted py-4">No users found</td></tr>
+                            <tr>
+                                <td colspan="7" class="text-center text-muted py-4">No users found</td>
+                            </tr>
                             <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
             </div>
-            <?php if ($users['last_page'] > 1): ?>
-            <div class="card-footer bg-white">
+            <?php if (($users['last_page'] ?? 1) > 1): ?>
+            <div class="card-footer" style="background: var(--bg-dark); border-top: 1px solid var(--border);">
                 <nav>
                     <ul class="pagination mb-0 justify-content-center">
                         <?php for ($p = 1; $p <= $users['last_page']; $p++): ?>
@@ -198,7 +337,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="create">
                 <div class="modal-header">
-                    <h5 class="modal-title">➕ Add New User</h5>
+                    <h5 class="modal-title">Add New User</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
@@ -246,7 +385,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
                 <input type="hidden" name="action" value="update">
                 <input type="hidden" name="user_id" id="edit-user-id">
                 <div class="modal-header">
-                    <h5 class="modal-title">✏️ Edit User</h5>
+                    <h5 class="modal-title">Edit User</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
@@ -284,6 +423,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Import CSV Modal -->
+    <div class="modal fade" id="modalImport" tabindex="-1">
+        <div class="modal-dialog">
+            <form method="POST" enctype="multipart/form-data" class="modal-content">
+                <?= csrf_field() ?>
+                <input type="hidden" name="action" value="import">
+                <div class="modal-header">
+                    <h5 class="modal-title">Import Users from CSV</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">CSV File *</label>
+                        <input type="file" name="csv_file" class="form-control" accept=".csv" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Default Role</label>
+                        <select name="role" class="form-select">
+                            <option value="student">Student</option>
+                            <option value="teacher">Teacher</option>
+                        </select>
+                    </div>
+                    <small class="text-muted">CSV format: lrn,first_name,last_name,email (email optional)</small>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Import</button>
                 </div>
             </form>
         </div>
