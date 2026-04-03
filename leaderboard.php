@@ -61,11 +61,11 @@ $userAchievements = $db->fetchAll(
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         :root {
-            --bg-dark: #0f172a;
-            --bg-card: #1e293b;
-            --border: #334155;
-            --text: #e2e8f0;
-            --text-muted: #94a3b8;
+            --bg-main: #f1f5f9;
+            --bg-card: #ffffff;
+            --border: #e2e8f0;
+            --text: #1e293b;
+            --text-muted: #64748b;
             --accent: #6366f1;
             --gold: #fbbf24;
             --silver: #94a3b8;
@@ -73,7 +73,7 @@ $userAchievements = $db->fetchAll(
         }
         
         body {
-            background: var(--bg-dark);
+            background: var(--bg-main);
             color: var(--text);
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
             min-height: 100vh;
@@ -101,7 +101,7 @@ $userAchievements = $db->fetchAll(
             z-index: 1000; overflow-y: auto;
         }
         .sidebar-brand { padding: 1.5rem; border-bottom: 1px solid var(--border); }
-        .sidebar-brand h4 { margin: 0; font-weight: 700; color: #fff; }
+        .sidebar-brand h4 { margin: 0; font-weight: 700; color: var(--text); }
         .sidebar-brand small { color: var(--text-muted); }
         .sidebar-nav { padding: 1rem 0; }
         .sidebar-nav a {
@@ -151,13 +151,13 @@ $userAchievements = $db->fetchAll(
             order: 3;
         }
         .podium-rank { font-size: 2rem; margin-bottom: 0.5rem; }
-        .podium-name { font-weight: 600; color: #fff; margin-bottom: 0.25rem; }
-        .podium-points { font-size: 1.25rem; font-weight: 700; color: #fff; }
+        .podium-name { font-weight: 600; color: var(--text); margin-bottom: 0.25rem; }
+        .podium-points { font-size: 1.25rem; font-weight: 700; color: var(--text); }
         .podium-avatar {
             width: 60px; height: 60px; border-radius: 50%;
             border: 3px solid rgba(255,255,255,0.3);
             margin: 0 auto 0.75rem;
-            background: var(--bg-dark);
+            background: var(--bg-main);
             display: flex; align-items: center; justify-content: center;
             font-size: 1.5rem;
         }
@@ -171,7 +171,7 @@ $userAchievements = $db->fetchAll(
             background: transparent; border-bottom: 1px solid var(--border);
             padding: 1rem 1.5rem;
         }
-        .xp-card .card-header h5 { margin: 0; font-weight: 600; color: #fff; }
+        .xp-card .card-header h5 { margin: 0; font-weight: 600; color: var(--text); }
         .xp-card .card-body { padding: 0; }
 
         .xp-table { width: 100%; border-collapse: collapse; }
@@ -194,19 +194,19 @@ $userAchievements = $db->fetchAll(
         }
         .rank-badge.gold { background: var(--gold); color: #000; }
         .rank-badge.silver { background: var(--silver); color: #000; }
-        .rank-badge.bronze { background: var(--bronze); color: #fff; }
-        .rank-badge.normal { background: var(--bg-dark); color: var(--text-muted); border: 1px solid var(--border); }
+        .rank-badge.bronze { background: var(--bronze); color: var(--text); }
+        .rank-badge.normal { background: var(--bg-main); color: var(--text-muted); border: 1px solid var(--border); }
 
         .stat-pill {
             display: inline-block; padding: 0.25rem 0.5rem;
             border-radius: 4px; font-size: 0.7rem;
-            background: var(--bg-dark); border: 1px solid var(--border);
+            background: var(--bg-main); border: 1px solid var(--border);
             margin-right: 0.25rem;
         }
 
         .achievement-icon {
             width: 40px; height: 40px; border-radius: 50%;
-            background: var(--bg-dark); border: 2px solid var(--accent);
+            background: var(--bg-main); border: 2px solid var(--accent);
             display: inline-flex; align-items: center; justify-content: center;
             margin-right: 0.5rem; font-size: 1.2rem;
         }

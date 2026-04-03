@@ -43,11 +43,11 @@ $recentAwards = $db->fetchAll(
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         :root {
-            --bg-dark: #0f172a;
-            --bg-card: #1e293b;
-            --border: #334155;
-            --text: #e2e8f0;
-            --text-muted: #94a3b8;
+            --bg-main: #f1f5f9;
+            --bg-card: #ffffff;
+            --border: #e2e8f0;
+            --text: #1e293b;
+            --text-muted: #64748b;
             --accent: #6366f1;
             --green: #22c55e;
             --yellow: #eab308;
@@ -64,10 +64,10 @@ $recentAwards = $db->fetchAll(
         .student-item.selected { border-color: var(--accent); background: rgba(99, 102, 241, 0.1); }
         .point-btn { padding: 0.75rem 1.5rem; border: 2px solid #e2e8f0; border-radius: 8px; background: #fff; cursor: pointer; transition: all 0.2s; font-weight: 600; }
         .point-btn:hover { border-color: var(--accent); color: var(--accent); }
-        .point-btn.selected { border-color: var(--accent); background: var(--accent); color: #fff; }
+        .point-btn.selected { border-color: var(--accent); background: var(--accent); color: var(--text); }
         .award-type-btn { padding: 0.5rem 1rem; border: 1px solid #e2e8f0; border-radius: 20px; background: #fff; cursor: pointer; transition: all 0.2s; font-size: 0.85rem; }
         .award-type-btn:hover { border-color: var(--accent); }
-        .award-type-btn.selected { border-color: var(--accent); background: var(--accent); color: #fff; }
+        .award-type-btn.selected { border-color: var(--accent); background: var(--accent); color: var(--text); }
         .award-history-item { padding: 0.75rem 0; border-bottom: 1px solid #e2e8f0; }
         .award-history-item:last-child { border-bottom: none; }
         .award-badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }

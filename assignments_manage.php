@@ -82,11 +82,11 @@ $assignments = $db->fetchAll(
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         :root {
-            --bg-dark: #0f172a;
-            --bg-card: #1e293b;
-            --border: #334155;
-            --text: #e2e8f0;
-            --text-muted: #94a3b8;
+            --bg-main: #f1f5f9;
+            --bg-card: #ffffff;
+            --border: #e2e8f0;
+            --text: #1e293b;
+            --text-muted: #64748b;
             --accent: #6366f1;
             --green: #22c55e;
             --yellow: #eab308;
@@ -94,7 +94,7 @@ $assignments = $db->fetchAll(
         }
         
         body {
-            background: var(--bg-dark);
+            background: var(--bg-main);
             color: var(--text);
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
             min-height: 100vh;
@@ -120,7 +120,7 @@ $assignments = $db->fetchAll(
             z-index: 1000; overflow-y: auto;
         }
         .sidebar-brand { padding: 1.5rem; border-bottom: 1px solid var(--border); }
-        .sidebar-brand h4 { margin: 0; font-weight: 700; color: #fff; }
+        .sidebar-brand h4 { margin: 0; font-weight: 700; color: var(--text); }
         .sidebar-brand small { color: var(--text-muted); }
         .sidebar-nav { padding: 1rem 0; }
         .sidebar-nav a {
@@ -148,7 +148,7 @@ $assignments = $db->fetchAll(
             background: transparent; border-bottom: 1px solid var(--border);
             padding: 1rem 1.5rem;
         }
-        .xp-card .card-header h5 { margin: 0; font-weight: 600; color: #fff; }
+        .xp-card .card-header h5 { margin: 0; font-weight: 600; color: var(--text); }
         .xp-card .card-body { padding: 1.5rem; }
 
         .xp-table { width: 100%; border-collapse: collapse; }
@@ -164,7 +164,7 @@ $assignments = $db->fetchAll(
         .xp-table tr:hover { background: rgba(99, 102, 241, 0.05); }
 
         .form-control, .form-select {
-            background: var(--bg-dark); border: 1px solid var(--border); color: var(--text);
+            background: var(--bg-main); border: 1px solid var(--border); color: var(--text);
         }
         .form-control:focus, .form-select:focus {
             border-color: var(--accent); box-shadow: 0 0 0 0.2rem rgba(99, 102, 241, 0.25);

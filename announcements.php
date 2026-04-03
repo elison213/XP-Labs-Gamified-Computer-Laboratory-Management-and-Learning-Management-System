@@ -81,16 +81,16 @@ if ($role === 'admin') {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         :root {
-            --bg-dark: #0f172a;
-            --bg-card: #1e293b;
-            --border: #334155;
-            --text: #e2e8f0;
-            --text-muted: #94a3b8;
+            --bg-main: #f1f5f9;
+            --bg-card: #ffffff;
+            --border: #e2e8f0;
+            --text: #1e293b;
+            --text-muted: #64748b;
             --accent: #6366f1;
         }
         
         body {
-            background: var(--bg-dark);
+            background: var(--bg-main);
             color: var(--text);
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
             min-height: 100vh;
@@ -116,7 +116,7 @@ if ($role === 'admin') {
             z-index: 1000; overflow-y: auto;
         }
         .sidebar-brand { padding: 1.5rem; border-bottom: 1px solid var(--border); }
-        .sidebar-brand h4 { margin: 0; font-weight: 700; color: #fff; }
+        .sidebar-brand h4 { margin: 0; font-weight: 700; color: var(--text); }
         .sidebar-brand small { color: var(--text-muted); }
         .sidebar-nav { padding: 1rem 0; }
         .sidebar-nav a {
@@ -144,22 +144,22 @@ if ($role === 'admin') {
             background: transparent; border-bottom: 1px solid var(--border);
             padding: 1rem 1.5rem;
         }
-        .xp-card .card-header h5 { margin: 0; font-weight: 600; color: #fff; }
+        .xp-card .card-header h5 { margin: 0; font-weight: 600; color: var(--text); }
         .xp-card .card-body { padding: 1.5rem; }
 
         .announcement-card {
-            background: var(--bg-dark); border: 1px solid var(--border);
+            background: var(--bg-main); border: 1px solid var(--border);
             border-radius: 8px; padding: 1.25rem; margin-bottom: 1rem;
             transition: all 0.2s;
         }
         .announcement-card:hover { border-color: var(--accent); }
         .announcement-card.pinned { border-left: 4px solid var(--accent); }
-        .announcement-card .title { font-weight: 600; color: #fff; margin-bottom: 0.5rem; }
+        .announcement-card .title { font-weight: 600; color: var(--text); margin-bottom: 0.5rem; }
         .announcement-card .content { color: var(--text-muted); font-size: 0.9rem; white-space: pre-wrap; }
         .announcement-card .meta { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.75rem; }
 
         .form-control, .form-select {
-            background: var(--bg-dark); border: 1px solid var(--border); color: var(--text);
+            background: var(--bg-main); border: 1px solid var(--border); color: var(--text);
         }
         .form-control:focus, .form-select:focus {
             border-color: var(--accent); box-shadow: 0 0 0 0.2rem rgba(99, 102, 241, 0.25);
