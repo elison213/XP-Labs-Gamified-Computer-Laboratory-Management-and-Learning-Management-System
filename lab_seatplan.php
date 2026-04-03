@@ -94,65 +94,25 @@ $gridRows = $currentFloor['grid_rows'] ?? 5;
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         :root {
-            --bg-dark: #0f172a;
-            --bg-card: #1e293b;
-            --border: #334155;
-            --text: #e2e8f0;
-            --text-muted: #94a3b8;
+            --bg-main: #f1f5f9;
+            --bg-card: #ffffff;
+            --border: #e2e8f0;
+            --text: #1e293b;
+            --text-muted: #64748b;
             --accent: #6366f1;
             --green: #22c55e;
             --yellow: #eab308;
             --red: #ef4444;
-            --gray: #64748b;
+            --gray: #94a3b8;
         }
         
         body {
-            background: var(--bg-dark);
+            background: var(--bg-main);
             color: var(--text);
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
             min-height: 100vh;
         }
         .main-content { margin-left: 260px; padding: 2rem; }
-        <?php if (($_SESSION['user_role'] ?? 'admin') === 'teacher'): ?>
-        /* Teacher mode: light background */
-        body { background: #f1f5f9 !important; }
-        .main-content { background: #f1f5f9; }
-        .floor-plan { background: #fff; border-color: #e2e8f0; }
-        .toolbar { background: #fff; border-color: #e2e8f0; }
-        .stat-chip { background: #fff; border-color: #e2e8f0; }
-        .stat-count { color: #1e293b; }
-        .stat-label { color: #64748b; }
-        .station-card { background: #fff; border-color: #e2e8f0; }
-        .station-code { color: #1e293b; }
-        .station-user { color: #64748b; }
-        .grid-cell { border-color: #e2e8f0; }
-        .empty-cell { color: #94a3b8; }
-        .form-control, .form-select { background: #fff; border-color: #e2e8f0; color: #1e293b; }
-        .floor-tab { background: #fff; border-color: #e2e8f0; color: #64748b; }
-        .floor-tab:hover { color: #1e293b; }
-        .board { background: linear-gradient(135deg, #e0e7ff, #c7d2fe); border-color: #a5b4fc; color: #312e81; }
-        .teacher-desk { background: linear-gradient(135deg, #e0e7ff, #c7d2fe); border-color: #6366f1; color: #312e81; }
-        .station-card:hover { border-color: #6366f1; }
-        .station-card.active { border-color: #22c55e; }
-        .station-card.idle { border-color: #eab308; }
-        .station-card.offline { border-color: #64748b; }
-        .station-card.maintenance { border-color: #ef4444; }
-        .grid-cell.drag-over { border-color: #6366f1; background: rgba(99, 102, 241, 0.1); }
-        .text-muted { color: #64748b !important; }
-        .text-white { color: #1e293b !important; }
-        .modal-content { background: #fff; }
-        .modal-header { border-color: #e2e8f0; }
-        .modal-footer { border-color: #e2e8f0; }
-        .alert { background: #fff; border-color: #e2e8f0; }
-        .btn-outline-light { color: #1e293b; border-color: #e2e8f0; }
-        .btn-outline-light:hover { background: #1e293b; color: #fff; }
-        .sidebar { background: #fff; border-color: #e2e8f0; }
-        .sidebar-brand h4 { color: #1e293b; }
-        .sidebar-brand small { color: #64748b; }
-        .sidebar-nav a { color: #64748b; }
-        .sidebar-nav a:hover, .sidebar-nav a.active { background: rgba(99, 102, 241, 0.1); color: #6366f1; }
-        .sidebar-nav .nav-section { color: #64748b; }
-        <?php endif; ?>
 
         /* Toolbar */
         .toolbar {
@@ -174,13 +134,13 @@ $gridRows = $currentFloor['grid_rows'] ?? 5;
 
         /* Board */
         .board {
-            background: linear-gradient(135deg, #1a365d, #2d3748);
-            border: 2px solid #4a5568;
+            background: linear-gradient(135deg, #e0e7ff, #c7d2fe);
+            border: 2px solid #a5b4fc;
             border-radius: 8px;
             padding: 0.75rem 2rem;
             text-align: center;
             margin-bottom: 1.5rem;
-            color: #e2e8f0;
+            color: #312e81;
             font-weight: 600;
         }
 
@@ -216,7 +176,7 @@ $gridRows = $currentFloor['grid_rows'] ?? 5;
         .station-card {
             width: 100%;
             height: 100%;
-            background: var(--bg-dark);
+            background: var(--bg-card);
             border: 2px solid var(--border);
             border-radius: 8px;
             padding: 0.5rem;
@@ -245,7 +205,7 @@ $gridRows = $currentFloor['grid_rows'] ?? 5;
         .station-status.maintenance { background: var(--red); }
         
         .station-icon { font-size: 1.5rem; margin-bottom: 0.25rem; }
-        .station-code { font-weight: 700; font-size: 0.75rem; color: #fff; }
+        .station-code { font-weight: 700; font-size: 0.75rem; color: var(--text); }
         .station-user { font-size: 0.65rem; color: var(--text-muted); }
 
         /* Empty cell */
@@ -270,7 +230,7 @@ $gridRows = $currentFloor['grid_rows'] ?? 5;
         .stat-dot.yellow { background: var(--yellow); }
         .stat-dot.gray { background: var(--gray); }
         .stat-dot.red { background: var(--red); }
-        .stat-count { font-weight: 700; font-size: 1.1rem; color: #fff; }
+        .stat-count { font-weight: 700; font-size: 1.1rem; color: var(--text); }
         .stat-label { font-size: 0.75rem; color: var(--text-muted); }
 
         /* Floor tabs */
@@ -286,7 +246,7 @@ $gridRows = $currentFloor['grid_rows'] ?? 5;
 
         /* Form */
         .form-control, .form-select {
-            background: var(--bg-dark); border: 1px solid var(--border); color: var(--text);
+            background: var(--bg-card); border: 1px solid var(--border); color: var(--text);
         }
         .form-control:focus, .form-select:focus {
             border-color: var(--accent); box-shadow: 0 0 0 0.2rem rgba(99, 102, 241, 0.25);
@@ -296,11 +256,11 @@ $gridRows = $currentFloor['grid_rows'] ?? 5;
         .teacher-desk {
             margin-top: 1.5rem;
             padding: 1rem;
-            background: linear-gradient(135deg, #312e81, #4338ca);
-            border: 2px solid var(--accent);
+            background: linear-gradient(135deg, #e0e7ff, #c7d2fe);
+            border: 2px solid #a5b4fc;
             border-radius: 8px;
             text-align: center;
-            color: #fff;
+            color: #312e81;
             font-weight: 600;
         }
     </style>

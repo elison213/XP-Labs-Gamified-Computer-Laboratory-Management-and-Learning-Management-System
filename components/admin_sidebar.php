@@ -11,40 +11,29 @@ $isTeacher = ($currentRole === 'teacher');
 <style>
 .sidebar {
     position: fixed; top: 0; left: 0; width: 260px; height: 100vh;
-    background: var(--bg-card, #1e293b); border-right: 1px solid var(--border, #334155);
+    background: #1e293b; border-right: 1px solid #334155;
     z-index: 1000; overflow-y: auto;
 }
-.sidebar-brand { padding: 1.5rem; border-bottom: 1px solid var(--border, #334155); }
+.sidebar-brand { padding: 1.5rem; border-bottom: 1px solid #334155; }
 .sidebar-brand h4 { margin: 0; font-weight: 700; color: #fff; }
-.sidebar-brand small { color: var(--text-muted, #94a3b8); }
+.sidebar-brand small { color: #94a3b8; }
 .sidebar-nav { padding: 1rem 0; }
 .sidebar-nav a {
     display: flex; align-items: center; gap: 0.75rem;
-    padding: 0.75rem 1.5rem; color: var(--text-muted, #94a3b8);
+    padding: 0.75rem 1.5rem; color: #94a3b8;
     text-decoration: none; transition: all 0.2s;
 }
 .sidebar-nav a:hover, .sidebar-nav a.active {
-    background: rgba(99, 102, 241, 0.1); color: var(--accent, #6366f1);
+    background: rgba(99, 102, 241, 0.1); color: #6366f1;
 }
 .sidebar-nav a i { width: 20px; text-align: center; }
 .sidebar-nav .nav-section {
     padding: 0.5rem 1.5rem; font-size: 0.7rem;
     text-transform: uppercase; letter-spacing: 0.05em;
-    color: var(--text-muted, #94a3b8); margin-top: 0.5rem;
+    color: #94a3b8; margin-top: 0.5rem;
 }
-<?php if ($isTeacher): ?>
-/* Teacher mode: light sidebar */
-.sidebar { background: #fff !important; border-color: #e2e8f0 !important; }
-.sidebar-brand { border-color: #e2e8f0 !important; }
-.sidebar-brand h4 { color: #1e293b !important; }
-.sidebar-brand small { color: #64748b !important; }
-.sidebar-nav a { color: #64748b !important; }
-.sidebar-nav a:hover, .sidebar-nav a.active { background: rgba(99, 102, 241, 0.1) !important; color: #6366f1 !important; }
-.sidebar-nav .nav-section { color: #64748b !important; }
-/* Teacher mode: light background for main content */
-body { background: #f1f5f9 !important; color: #1e293b !important; }
-.main-content { background: #f1f5f9 !important; }
-<?php endif; ?>
+/* Main content area - light theme */
+.main-content { margin-left: 260px; }
 </style>
 <nav class="sidebar">
     <div class="sidebar-brand">

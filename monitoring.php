@@ -40,24 +40,24 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         :root {
-            --bg-dark: #0f172a;
-            --bg-card: #1e293b;
-            --bg-panel: #1e293b;
-            --border: #334155;
-            --text: #e2e8f0;
-            --text-muted: #94a3b8;
+            --bg-main: #f1f5f9;
+            --bg-card: #ffffff;
+            --bg-panel: #ffffff;
+            --border: #e2e8f0;
+            --text: #1e293b;
+            --text-muted: #64748b;
             --accent: #6366f1;
             --green: #22c55e;
             --yellow: #eab308;
             --red: #ef4444;
-            --gray: #64748b;
+            --gray: #94a3b8;
             --orange: #f97316;
         }
         
         * { box-sizing: border-box; }
         
         body {
-            background: var(--bg-dark);
+            background: var(--bg-main);
             color: var(--text);
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
             margin: 0;
@@ -79,7 +79,7 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
             width: calc(100% - 260px);
         }
         .topbar-brand { display: flex; align-items: center; gap: 0.75rem; }
-        .topbar-brand h5 { margin: 0; font-weight: 700; color: #fff; }
+        .topbar-brand h5 { margin: 0; font-weight: 700; color: var(--text); }
         .topbar-brand span { color: var(--text-muted); font-size: 0.85rem; }
         
         /* Stats Bar */
@@ -96,7 +96,7 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
             align-items: center;
             gap: 0.5rem;
             padding: 0.5rem 1rem;
-            background: var(--bg-dark);
+            background: var(--bg-card);
             border-radius: 8px;
             border: 1px solid var(--border);
         }
@@ -109,7 +109,7 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
         .stat-dot.yellow { background: var(--yellow); }
         .stat-dot.red { background: var(--red); }
         .stat-dot.gray { background: var(--gray); }
-        .stat-count { font-weight: 700; font-size: 1.1rem; color: #fff; }
+        .stat-count { font-weight: 700; font-size: 1.1rem; color: var(--text); }
         .stat-label { font-size: 0.75rem; color: var(--text-muted); }
 
         /* Floor Tabs */
@@ -124,12 +124,13 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
         .floor-tab {
             padding: 0.5rem 1.25rem;
             border-radius: 6px;
-            background: var(--bg-dark);
+            background: var(--bg-card);
             border: 1px solid var(--border);
             color: var(--text-muted);
             cursor: pointer;
             white-space: nowrap;
             transition: all 0.2s;
+            text-decoration: none;
         }
         .floor-tab:hover { border-color: var(--accent); color: var(--text); }
         .floor-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
@@ -152,7 +153,7 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
             padding: 0.5rem 1rem;
             border-radius: 6px;
             border: 1px solid var(--border);
-            background: var(--bg-dark);
+            background: var(--bg-card);
             color: var(--text-muted);
             cursor: pointer;
             transition: all 0.2s;
@@ -185,13 +186,13 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
 
         /* Board */
         .board-indicator {
-            background: linear-gradient(135deg, #1a365d, #2d3748);
-            border: 2px solid #4a5568;
+            background: linear-gradient(135deg, #e0e7ff, #c7d2fe);
+            border: 2px solid #a5b4fc;
             border-radius: 8px;
             padding: 0.75rem 2rem;
             text-align: center;
             margin-bottom: 1.5rem;
-            color: #e2e8f0;
+            color: #312e81;
             font-weight: 600;
         }
 
@@ -243,18 +244,18 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
         .seat-plan-card .seat-status.offline { background: var(--gray); }
         .seat-plan-card .seat-status.maintenance { background: var(--red); }
         .seat-plan-card .seat-icon { font-size: 1.25rem; margin-bottom: 0.25rem; }
-        .seat-plan-card .seat-number { font-weight: 700; font-size: 0.7rem; color: #fff; }
+        .seat-plan-card .seat-number { font-weight: 700; font-size: 0.7rem; color: var(--text); }
         .seat-plan-card .seat-user { font-size: 0.6rem; color: var(--text-muted); }
 
         /* Teacher Desk */
         .teacher-desk-indicator {
             margin-top: 1.5rem;
             padding: 0.75rem;
-            background: linear-gradient(135deg, #312e81, #4338ca);
-            border: 2px solid var(--accent);
+            background: linear-gradient(135deg, #e0e7ff, #c7d2fe);
+            border: 2px solid #a5b4fc;
             border-radius: 8px;
             text-align: center;
-            color: #fff;
+            color: #312e81;
             font-weight: 600;
             font-size: 0.85rem;
         }
@@ -262,7 +263,7 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
             font-size: 1.1rem;
             font-weight: 600;
             margin-bottom: 1rem;
-            color: #fff;
+            color: var(--text);
         }
         .seat-grid {
             display: grid;
@@ -317,7 +318,7 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
         .seat-number {
             font-weight: 700;
             font-size: 0.9rem;
-            color: #fff;
+            color: var(--text);
             margin-bottom: 0.25rem;
         }
         .seat-user {
@@ -360,7 +361,7 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
         
         /* Seat Detail Modal */
         .seat-detail {
-            background: var(--bg-dark);
+            background: var(--bg-card);
             border-radius: 8px;
             padding: 1rem;
         }
@@ -372,7 +373,7 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
         }
         .detail-row:last-child { border-bottom: none; }
         .detail-label { color: var(--text-muted); font-size: 0.85rem; }
-        .detail-value { color: #fff; font-size: 0.85rem; font-weight: 500; }
+        .detail-value { color: var(--text); font-size: 0.85rem; font-weight: 500; }
         
         .action-btn {
             width: 100%;
@@ -404,7 +405,7 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
             padding: 0.4rem 0.8rem;
             border-radius: 20px;
             border: 1px solid var(--border);
-            background: transparent;
+            background: var(--bg-card);
             color: var(--text-muted);
             font-size: 0.8rem;
             cursor: pointer;
@@ -419,86 +420,6 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
             color: var(--text-muted);
         }
         .empty-state i { font-size: 3rem; margin-bottom: 1rem; opacity: 0.5; }
-        <?php if (($_SESSION['user_role'] ?? 'admin') === 'teacher'): ?>
-        /* Teacher mode: light theme - placed at END for cascade override */
-        body { background: #f1f5f9 !important; color: #1e293b !important; }
-        .topbar { background: #fff !important; border-color: #e2e8f0 !important; }
-        .topbar-brand h5 { color: #1e293b !important; }
-        .topbar-brand span { color: #64748b !important; }
-        .stats-bar { background: #fff !important; border-color: #e2e8f0 !important; }
-        .stat-chip { background: #fff !important; border-color: #e2e8f0 !important; }
-        .stat-count { color: #1e293b !important; }
-        .stat-label { color: #64748b !important; }
-        .stat-dot.green { background: #22c55e !important; box-shadow: 0 0 8px #22c55e !important; }
-        .stat-dot.yellow { background: #eab308 !important; }
-        .stat-dot.red { background: #ef4444 !important; }
-        .stat-dot.gray { background: #64748b !important; }
-        .floor-tabs { border-color: #e2e8f0 !important; }
-        .floor-tab { background: #fff !important; border-color: #e2e8f0 !important; color: #64748b !important; }
-        .floor-tab:hover { color: #1e293b !important; }
-        .floor-tab.active { background: #6366f1 !important; border-color: #6366f1 !important; color: #fff !important; }
-        .side-panel { background: #fff !important; border-color: #e2e8f0 !important; }
-        .seat-card { background: #fff !important; border-color: #e2e8f0 !important; }
-        .seat-card:hover { border-color: #6366f1 !important; }
-        .seat-card.active { border-color: #22c55e !important; background: rgba(34, 197, 94, 0.1) !important; }
-        .seat-card.idle { border-color: #eab308 !important; background: rgba(234, 179, 8, 0.05) !important; }
-        .seat-card.offline { border-color: #64748b !important; opacity: 0.6 !important; }
-        .seat-card.maintenance { border-color: #ef4444 !important; background: rgba(239, 68, 68, 0.1) !important; }
-        .seat-number { color: #1e293b !important; }
-        .seat-user { color: #64748b !important; }
-        .seat-task { color: #6366f1 !important; }
-        .seat-icon { color: #64748b !important; }
-        .teacher-desk-indicator { background: linear-gradient(135deg, #e0e7ff, #c7d2fe) !important; border-color: #6366f1 !important; color: #312e81 !important; }
-        .floor-title { color: #1e293b !important; }
-        .panel-section h6 { color: #64748b !important; border-color: #e2e8f0 !important; }
-        .panel-section-title { color: #1e293b !important; }
-        .panel-item { background: #f8fafc !important; border-color: #e2e8f0 !important; }
-        .panel-item-title { color: #1e293b !important; }
-        .panel-item-subtitle { color: #64748b !important; }
-        .btn-outline-light { color: #1e293b !important; border-color: #e2e8f0 !important; }
-        .btn-outline-light:hover { background: #f1f5f9 !important; color: #1e293b !important; }
-        .text-muted { color: #64748b !important; }
-        .text-white { color: #1e293b !important; }
-        .form-control, .form-select { background: #fff !important; border-color: #e2e8f0 !important; color: #1e293b !important; }
-        .modal-content { background: #fff !important; }
-        .modal-header { border-color: #e2e8f0 !important; }
-        .modal-footer { border-color: #e2e8f0 !important; }
-        .board-indicator { background: linear-gradient(135deg, #e0e7ff, #c7d2fe) !important; border-color: #a5b4fc !important; color: #312e81 !important; }
-        .seat-plan-card { background: #fff !important; border-color: #e2e8f0 !important; }
-        .seat-plan-card:hover { border-color: #6366f1 !important; }
-        .seat-plan-card.active { border-color: #22c55e !important; background: rgba(34, 197, 94, 0.1) !important; }
-        .seat-plan-card.idle { border-color: #eab308 !important; background: rgba(234, 179, 8, 0.05) !important; }
-        .seat-plan-card.offline { border-color: #64748b !important; opacity: 0.5 !important; }
-        .seat-plan-card.maintenance { border-color: #ef4444 !important; background: rgba(239, 68, 68, 0.1) !important; }
-        .seat-plan-card .seat-number { color: #1e293b !important; }
-        .seat-plan-card .seat-user { color: #64748b !important; }
-        .seat-plan-cell { border-color: #e2e8f0 !important; }
-        .view-btn { background: #fff !important; border-color: #e2e8f0 !important; color: #64748b !important; }
-        .view-btn:hover { border-color: #6366f1 !important; color: #1e293b !important; }
-        .view-btn.active { background: #6366f1 !important; border-color: #6366f1 !important; color: #fff !important; }
-        .seat-detail { background: #fff !important; }
-        .detail-label { color: #64748b !important; }
-        .detail-value { color: #1e293b !important; }
-        .action-btn { background: #fff !important; border-color: #e2e8f0 !important; color: #1e293b !important; }
-        .action-btn:hover { border-color: #6366f1 !important; background: rgba(99, 102, 241, 0.1) !important; }
-        .filter-btn { background: #fff !important; border-color: #e2e8f0 !important; color: #64748b !important; }
-        .filter-btn:hover, .filter-btn.active { background: #6366f1 !important; border-color: #6366f1 !important; color: #fff !important; }
-        .empty-state { color: #64748b !important; }
-        .seat-status.active { background: #22c55e !important; box-shadow: 0 0 10px #22c55e !important; }
-        .seat-status.idle { background: #eab308 !important; }
-        .seat-status.offline { background: #64748b !important; }
-        .seat-status.maintenance { background: #ef4444 !important; }
-        .seat-plan-card .seat-status.active { background: #22c55e !important; box-shadow: 0 0 6px #22c55e !important; }
-        .seat-plan-card .seat-status.idle { background: #eab308 !important; }
-        .seat-plan-card .seat-status.offline { background: #64748b !important; }
-        .seat-plan-card .seat-status.maintenance { background: #ef4444 !important; }
-        .seat-plan-card .seat-icon .text-success { color: #22c55e !important; }
-        .seat-plan-card .seat-icon .text-warning { color: #eab308 !important; }
-        .seat-plan-card .seat-icon .text-danger { color: #ef4444 !important; }
-        .seat-plan-card .seat-icon .text-secondary { color: #64748b !important; }
-        .seat-card .seat-icon .text-muted { color: #64748b !important; }
-        .seat-plan-cell span.text-muted { color: #94a3b8 !important; }
-        <?php endif; ?>
     </style>
 </head>
 <body>
