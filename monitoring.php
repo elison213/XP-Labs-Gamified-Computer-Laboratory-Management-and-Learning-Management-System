@@ -75,6 +75,8 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
             position: sticky;
             top: 0;
             z-index: 100;
+            margin-left: 260px;
+            width: calc(100% - 260px);
         }
         .topbar-brand { display: flex; align-items: center; gap: 0.75rem; }
         .topbar-brand h5 { margin: 0; font-weight: 700; color: #fff; }
@@ -87,6 +89,7 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
             padding: 1rem 1.5rem;
             background: var(--bg-card);
             border-bottom: 1px solid var(--border);
+            margin-left: 260px;
         }
         .stat-chip {
             display: flex;
@@ -116,6 +119,7 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
             padding: 0.75rem 1.5rem;
             border-bottom: 1px solid var(--border);
             overflow-x: auto;
+            margin-left: 260px;
         }
         .floor-tab {
             padding: 0.5rem 1.25rem;
@@ -135,6 +139,7 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
             display: grid;
             grid-template-columns: 1fr 320px;
             height: calc(100vh - 180px);
+            margin-left: 260px;
         }
 
         /* View Toggle */
@@ -421,7 +426,7 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
     <?php include __DIR__ . '/components/admin_sidebar.php'; ?>
 
     <!-- Top Bar -->
-    <div class="topbar" style="margin-left: 260px;">
+    <div class="topbar" style="margin-left: 260px; width: calc(100% - 260px);">
         <div class="topbar-brand">
             <div>
                 <h5><i class="bi bi-display me-2"></i>XPLabs Lab Monitor</h5>
