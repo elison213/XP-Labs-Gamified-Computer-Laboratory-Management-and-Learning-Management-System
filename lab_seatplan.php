@@ -277,7 +277,7 @@ $gridRows = $currentFloor['grid_rows'] ?? 5;
                 <p class="text-muted mb-0">Drag and drop stations to arrange the floor layout</p>
             </div>
             <div class="d-flex gap-2">
-                <button class="btn btn-outline-light btn-sm" onclick="saveLayout()">
+                <button class="btn btn-outline-secondary btn-sm" onclick="saveLayout()">
                     <i class="bi bi-save me-1"></i> Save Layout
                 </button>
                 <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalAddStation">
