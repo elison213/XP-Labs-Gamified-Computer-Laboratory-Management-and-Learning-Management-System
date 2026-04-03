@@ -18,9 +18,19 @@ $pointService = new PointService();
 $user = $db->fetch("SELECT * FROM users WHERE id = ?", [$userId]);
 
 // Points
-$points = $pointService->getPoints($userId);
-$rank = $pointService->getRank($userId);
-$achievements = $pointService->getAchievements($userId);
+$points = $pointService->getBalance($userId);
+$totalEarned = $pointService->getTotalEarned($userId);
+$rank = $pointService->getUserRank($userId);
+
+// Achievements
+$achievements = $db->fetchAll(
+    "SELECT a.*, ua.earned_at
+     FROM user_achievements ua
+     JOIN achievements a ON ua.achievement_id = a.id
+     WHERE ua.user_id = ?
+     ORDER BY ua.earned_at DESC",
+    [$userId]
+);
 
 // Today's attendance
 $todayAttendance = $db->fetch(

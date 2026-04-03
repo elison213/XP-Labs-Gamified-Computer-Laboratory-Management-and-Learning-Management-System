@@ -158,3 +158,7 @@ Stack trace:
 #0 C:\xampp\htdocs\xplabs\incidents.php(167): array_sum(0)
 #1 {main}
   thrown in C:\xampp\htdocs\xplabs\incidents.php on line 167
+[03-Apr-2026 20:30:49 Asia/Manila] PHP Fatal error:  Uncaught Error: Call to undefined method XPLabs\Services\PointService::getPoints() in C:\xampp\htdocs\xplabs\dashboard_student.php:21
+Stack trace:
+#0 {main}
+  thrown in C:\xampp\htdocs\xplabs\dashboard_student.php on line 21
