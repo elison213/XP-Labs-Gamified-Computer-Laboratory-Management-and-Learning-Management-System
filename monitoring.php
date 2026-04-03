@@ -63,6 +63,39 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
             margin: 0;
             min-height: 100vh;
         }
+        <?php if (($_SESSION['user_role'] ?? 'admin') === 'teacher'): ?>
+        /* Teacher mode: light background */
+        body { background: #f1f5f9 !important; }
+        .topbar { background: #fff; border-color: #e2e8f0; }
+        .topbar-brand h5 { color: #1e293b; }
+        .topbar-brand span { color: #64748b; }
+        .stats-bar { background: #fff; border-color: #e2e8f0; }
+        .stat-chip { background: #fff; border-color: #e2e8f0; }
+        .stat-count { color: #1e293b; }
+        .stat-label { color: #64748b; }
+        .floor-tabs { border-color: #e2e8f0; }
+        .floor-tab { background: #fff; border-color: #e2e8f0; color: #64748b; }
+        .floor-tab:hover { color: #1e293b; }
+        .side-panel { background: #fff; border-color: #e2e8f0; }
+        .seat-card { background: #fff; border-color: #e2e8f0; }
+        .seat-number { color: #1e293b; }
+        .seat-user { color: #64748b; }
+        .seat-task { color: #6366f1; }
+        .teacher-desk-indicator { background: linear-gradient(135deg, #e0e7ff, #c7d2fe); border-color: #6366f1; color: #312e81; }
+        .floor-title { color: #1e293b; }
+        .panel-section-title { color: #1e293b; }
+        .panel-item { background: #f8fafc; border-color: #e2e8f0; }
+        .panel-item-title { color: #1e293b; }
+        .panel-item-subtitle { color: #64748b; }
+        .btn-outline-light { color: #1e293b; border-color: #e2e8f0; }
+        .btn-outline-light:hover { background: #f1f5f9; color: #1e293b; }
+        .text-muted { color: #64748b !important; }
+        .text-white { color: #1e293b !important; }
+        .form-control, .form-select { background: #fff; border-color: #e2e8f0; color: #1e293b; }
+        .modal-content { background: #fff; }
+        .modal-header { border-color: #e2e8f0; }
+        .modal-footer { border-color: #e2e8f0; }
+        <?php endif; ?>
 
         /* Top Bar */
         .topbar {

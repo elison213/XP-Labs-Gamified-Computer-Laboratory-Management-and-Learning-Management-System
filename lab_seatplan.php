@@ -112,32 +112,27 @@ $gridRows = $currentFloor['grid_rows'] ?? 5;
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
             min-height: 100vh;
         }
-
-        .sidebar {
-            position: fixed; top: 0; left: 0; width: 260px; height: 100vh;
-            background: var(--bg-card); border-right: 1px solid var(--border);
-            z-index: 1000; overflow-y: auto;
-        }
-        .sidebar-brand { padding: 1.5rem; border-bottom: 1px solid var(--border); }
-        .sidebar-brand h4 { margin: 0; font-weight: 700; color: #fff; }
-        .sidebar-brand small { color: var(--text-muted); }
-        .sidebar-nav { padding: 1rem 0; }
-        .sidebar-nav a {
-            display: flex; align-items: center; gap: 0.75rem;
-            padding: 0.75rem 1.5rem; color: var(--text-muted);
-            text-decoration: none; transition: all 0.2s;
-        }
-        .sidebar-nav a:hover, .sidebar-nav a.active {
-            background: rgba(99, 102, 241, 0.1); color: var(--accent);
-        }
-        .sidebar-nav a i { width: 20px; text-align: center; }
-        .sidebar-nav .nav-section {
-            padding: 0.5rem 1.5rem; font-size: 0.7rem;
-            text-transform: uppercase; letter-spacing: 0.05em;
-            color: var(--text-muted); margin-top: 0.5rem;
-        }
-
         .main-content { margin-left: 260px; padding: 2rem; }
+        <?php if (($_SESSION['user_role'] ?? 'admin') === 'teacher'): ?>
+        /* Teacher mode: light background */
+        body { background: #f1f5f9 !important; }
+        .main-content { background: #f1f5f9; }
+        .floor-plan { background: #fff; border-color: #e2e8f0; }
+        .toolbar { background: #fff; border-color: #e2e8f0; }
+        .stat-chip { background: #fff; border-color: #e2e8f0; }
+        .stat-count { color: #1e293b; }
+        .stat-label { color: #64748b; }
+        .station-card { background: #fff; border-color: #e2e8f0; }
+        .station-code { color: #1e293b; }
+        .station-user { color: #64748b; }
+        .grid-cell { border-color: #e2e8f0; }
+        .empty-cell { color: #94a3b8; }
+        .form-control, .form-select { background: #fff; border-color: #e2e8f0; color: #1e293b; }
+        .floor-tab { background: #fff; border-color: #e2e8f0; color: #64748b; }
+        .floor-tab:hover { color: #1e293b; }
+        .board { background: linear-gradient(135deg, #e0e7ff, #c7d2fe); border-color: #a5b4fc; color: #312e81; }
+        .teacher-desk { background: linear-gradient(135deg, #e0e7ff, #c7d2fe); border-color: #6366f1; color: #312e81; }
+        <?php endif; ?>
 
         /* Toolbar */
         .toolbar {
