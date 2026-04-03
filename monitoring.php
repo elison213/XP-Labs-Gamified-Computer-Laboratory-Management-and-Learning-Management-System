@@ -417,8 +417,11 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
     </style>
 </head>
 <body>
+    <!-- Sidebar -->
+    <?php include __DIR__ . '/components/admin_sidebar.php'; ?>
+
     <!-- Top Bar -->
-    <div class="topbar">
+    <div class="topbar" style="margin-left: 260px;">
         <div class="topbar-brand">
             <div>
                 <h5><i class="bi bi-display me-2"></i>XPLabs Lab Monitor</h5>
