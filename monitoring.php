@@ -435,7 +435,7 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
             </div>
         </div>
         <div class="d-flex gap-2">
-            <a href="<?= $_SESSION['user_role'] === 'admin' ? 'dashboard_admin.php' : 'dashboard_teacher.php' ?>" class="btn btn-sm btn-outline-light">
+            <a href="<?= $_SESSION['user_role'] === 'admin' ? 'dashboard_admin.php' : 'dashboard_teacher.php' ?>" class="btn btn-sm btn-outline-secondary">
                 <i class="bi bi-arrow-left me-1"></i> Back
             </a>
             <button class="btn btn-sm btn-primary" id="btn-refresh">
