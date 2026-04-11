@@ -4,9 +4,11 @@
  * Usage: Include this file after Auth is initialized
  * Teachers see limited navigation, Admins see full navigation
  */
-$currentRole = $role ?? ($_SESSION['user_role'] ?? 'admin');
+// Determine the current user's role. Fallback to 'admin' if not set.
+$currentRole = $_SESSION['user_role'] ?? 'admin';
 $currentPage = basename($_SERVER['PHP_SELF']);
-$isTeacher = ($currentRole === 'teacher');
+// Identify if the user is an admin. This will be used to conditionally display admin-only sections.
+$isAdmin = ($currentRole === 'admin');
 ?>
 <style>
 .sidebar {
@@ -41,7 +43,7 @@ $isTeacher = ($currentRole === 'teacher');
         <small><?= ucfirst($currentRole) ?> Portal</small>
     </div>
     <div class="sidebar-nav">
-        <a href="dashboard_<?= $currentRole === 'student' ? 'student' : ($currentRole === 'admin' ? 'admin' : 'teacher') ?>.php" class="<?= $currentPage === 'dashboard_admin.php' || $currentPage === 'dashboard_teacher.php' ? 'active' : '' ?>">
+        <a href="dashboard_<?= $currentRole === 'student' ? 'student' : ($currentRole === 'admin' ? 'admin' : 'teacher') ?>.php" class="<?= in_array($currentPage, ['dashboard_student.php', 'dashboard_admin.php', 'dashboard_teacher.php']) ? 'active' : '' ?>">
             <i class="bi bi-grid-1x2"></i> Dashboard
         </a>
         <a href="monitoring.php" class="<?= $currentPage === 'monitoring.php' ? 'active' : '' ?>">
@@ -51,7 +53,7 @@ $isTeacher = ($currentRole === 'teacher');
             <i class="bi bi-layout-text-window-reverse"></i> Seat Plan
         </a>
         
-        <?php if (!$isTeacher): ?>
+        <?php if ($isAdmin): ?>
         <div class="nav-section">Management</div>
         <a href="admin_users.php" class="<?= $currentPage === 'admin_users.php' ? 'active' : '' ?>">
             <i class="bi bi-people"></i> Users
@@ -97,7 +99,7 @@ $isTeacher = ($currentRole === 'teacher');
             <i class="bi bi-trophy"></i> Leaderboard
         </a>
         
-        <?php if (!$isTeacher): ?>
+        <?php if ($isAdmin): ?>
         <div class="nav-section">System</div>
         <a href="admin_logs.php" class="<?= $currentPage === 'admin_logs.php' ? 'active' : '' ?>">
             <i class="bi bi-activity"></i> Activity Logs
