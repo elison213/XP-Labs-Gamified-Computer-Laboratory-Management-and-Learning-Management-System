@@ -16,6 +16,11 @@ $labService = new LabService();
 $floors = $labService->getFloors();
 $stations = $labService->getStations();
 $stats = $labService->getStats();
+$adStats = [
+    'computers' => $db->query("SELECT COUNT(*) AS cnt FROM ad_computers")->fetchColumn(),
+    'users' => $db->query("SELECT COUNT(*) AS cnt FROM ad_users")->fetchColumn(),
+    'groups' => $db->query("SELECT COUNT(*) AS cnt FROM ad_groups")->fetchColumn()
+];
 
 // Group stations by floor
 $stationsByFloor = [];
@@ -445,7 +450,63 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
     </div>
 
     <!-- Stats Bar -->
-    <div class="stats-bar">
+<div class="stats-bar">
+    <div class="stat-chip">
+        <div class="stat-dot green"></div>
+        <div>
+            <div class="stat-count" id="stat-active"><?= $stats['active'] ?></div>
+            <div class="stat-label">Active</div>
+        </div>
+    </div>
+    <div class="stat-chip">
+        <div class="stat-dot yellow"></div>
+        <div>
+            <div class="stat-count" id="stat-idle"><?= $stats['idle'] ?></div>
+            <div class="stat-label">Idle</div>
+        </div>
+    </div>
+    <div class="stat-chip">
+        <div class="stat-dot gray"></div>
+        <div>
+            <div class="stat-count" id="stat-offline"><?= $stats['offline'] ?></div>
+            <div class="stat-label">Offline</div>
+        </div>
+    </div>
+    <div class="stat-chip">
+        <div class="stat-dot red"></div>
+        <div>
+            <div class="stat-count" id="stat-maintenance"><?= $stats['maintenance'] ?></div>
+            <div class="stat-label">Maintenance</div>
+        </div>
+    </div>
+    <div class="stat-chip ms-auto">
+        <div>
+            <div class="stat-count"><?= $stats['total'] ?></div>
+            <div class="stat-label">Total Stations</div>
+        </div>
+    </div>
+    <!-- AD Stats -->
+    <div class="stat-chip">
+        <div class="stat-dot" style="background:#4a90e2;"></div>
+        <div>
+            <div class="stat-count" id="ad-computers"><?= $adStats['computers'] ?></div>
+            <div class="stat-label">AD Computers</div>
+        </div>
+    </div>
+    <div class="stat-chip">
+        <div class="stat-dot" style="background:#7b5cb0;"></div>
+        <div>
+            <div class="stat-count" id="ad-users"><?= $adStats['users'] ?></div>
+            <div class="stat-label">AD Users</div>
+        </div>
+    </div>
+    <div class="stat-chip">
+        <div class="stat-dot" style="background:#c94a4a;"></div>
+        <div>
+            <div class="stat-count" id="ad-groups"><?= $adStats['groups'] ?></div>
+            <div class="stat-label">AD Groups</div>
+        </div>
+    </div>
         <div class="stat-chip">
             <div class="stat-dot green"></div>
             <div>
