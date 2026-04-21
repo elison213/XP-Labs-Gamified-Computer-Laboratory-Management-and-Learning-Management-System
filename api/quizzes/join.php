@@ -1,7 +1,7 @@
 <?php
 /**
  * XPLabs API - POST /api/quizzes/{id}/join
- * Join a quiz by quiz ID or quiz code.
+ * Join a quiz by quiz ID.
  */
 
 header('Content-Type: application/json');
@@ -21,32 +21,16 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 Auth::require();
 
-$input = json_decode(file_get_contents('php://input'), true);
+$input = json_decode(file_get_contents('php://input'), true) ?? [];
 $quizId = (int) ($input['quiz_id'] ?? ($_GET['id'] ?? 0));
-$quizCode = trim($input['quiz_code'] ?? '');
 
-if (!$quizId && empty($quizCode)) {
+if (!$quizId) {
     http_response_code(400);
-    echo json_encode(['error' => 'quiz_id or quiz_code is required']);
+    echo json_encode(['error' => 'quiz_id is required']);
     exit;
 }
 
 $quizService = new QuizService();
-
-// If quiz code provided, look up the quiz
-if (empty($quizId) && !empty($quizCode)) {
-    $db = \XPLabs\Lib\Database::getInstance();
-    $quiz = $db->fetch("SELECT * FROM quizzes WHERE quiz_code = ? AND status = 'published'", [$quizCode]);
-    if ($quiz) {
-        $quizId = $quiz['id'];
-    }
-}
-
-if (!$quizId) {
-    http_response_code(404);
-    echo json_encode(['error' => 'Quiz not found']);
-    exit;
-}
 
 $userId = Auth::id();
 $result = $quizService->startAttempt($quizId, $userId);

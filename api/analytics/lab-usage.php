@@ -14,17 +14,50 @@ use XPLabs\Lib\Database;
 Auth::requireRole(['admin', 'teacher']);
 
 $db = Database::getInstance();
+$userId = Auth::id();
+$role = Auth::role();
+$courseId = (int) ($_GET['course_id'] ?? 0);
+
+$sessionScope = "1=1";
+$sessionParams = [];
+if ($courseId) {
+    if ($role === 'teacher') {
+        $owned = (int) $db->fetchOne("SELECT COUNT(*) FROM courses WHERE id = ? AND teacher_id = ?", [$courseId, $userId]);
+        if ($owned === 0) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Invalid course access']);
+            exit;
+        }
+    }
+    $sessionScope .= " AND EXISTS (
+        SELECT 1 FROM course_enrollments ce
+        WHERE ce.user_id = a.user_id
+          AND ce.course_id = ?
+          AND ce.status = 'enrolled'
+    )";
+    $sessionParams[] = $courseId;
+} elseif ($role === 'teacher') {
+    $sessionScope .= " AND EXISTS (
+        SELECT 1 FROM course_enrollments ce
+        JOIN courses c ON c.id = ce.course_id
+        WHERE ce.user_id = a.user_id
+          AND ce.status = 'enrolled'
+          AND c.teacher_id = ?
+    )";
+    $sessionParams[] = $userId;
+}
 
 // Station utilization (hours used in last 30 days)
 $stations = $db->fetchAll(
     "SELECT ls.station_code as code,
-            COALESCE(SUM(TIMESTAMPDIFF(HOUR, sa.clock_in, sa.clock_out)), 0) as hours
+            COALESCE(SUM(TIMESTAMPDIFF(HOUR, a.clock_in, a.clock_out)), 0) as hours
      FROM lab_stations ls
-     LEFT JOIN station_assignments sa ON ls.id = sa.station_id 
-        AND sa.clock_in >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+     LEFT JOIN attendance_sessions a ON ls.id = a.station_id 
+        AND a.clock_in >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+        AND $sessionScope
      GROUP BY ls.id
      ORDER BY ls.station_code",
-    []
+    $sessionParams
 );
 
 // Total possible hours (30 days * 12 hours/day = 360 hours per station)
@@ -35,12 +68,13 @@ $utilization = $totalPossible > 0 ? round(($totalUsed / $totalPossible) * 100, 1
 
 // Heatmap data (day of week x hour of day)
 $heatmapData = $db->fetchAll(
-    "SELECT DAYOFWEEK(clock_in) as day, HOUR(clock_in) as hour, COUNT(*) as count
-     FROM attendance_sessions
-     WHERE clock_in >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-     GROUP BY DAYOFWEEK(clock_in), HOUR(clock_in)
+    "SELECT DAYOFWEEK(a.clock_in) as day, HOUR(a.clock_in) as hour, COUNT(*) as count
+     FROM attendance_sessions a
+     WHERE a.clock_in >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+       AND $sessionScope
+     GROUP BY DAYOFWEEK(a.clock_in), HOUR(a.clock_in)
      ORDER BY day, hour",
-    []
+    $sessionParams
 );
 
 // Build heatmap matrix (7 days x 12 hours: 7AM-6PM)

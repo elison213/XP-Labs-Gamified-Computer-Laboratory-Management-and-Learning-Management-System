@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             'status' => $s['is_maintenance'] ? 'maintenance' : ($s['status'] ?? 'offline'),
             'user' => $user,
             'since' => $s['checkin_time'] ? date('H:i', strtotime($s['checkin_time'])) : null,
-            'task' => null,
+            'task' => $s['task'] ?? null,
             'hostname' => $s['hostname'] ?? null,
             'ip_address' => $s['ip_address'] ?? null,
         ];

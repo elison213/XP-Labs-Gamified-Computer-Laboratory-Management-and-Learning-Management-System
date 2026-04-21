@@ -53,25 +53,25 @@ if ($role === 'admin' || $role === 'teacher') {
     if ($courseId) {
         $assignments = $db->fetchAll(
             "SELECT a.*, u.first_name, u.last_name, c.name as course_name,
-                    s.status as my_submission_status, s.submitted_at as my_submitted_at, s.grade
+                    s.status as my_submission_status, s.submitted_at as my_submitted_at, s.score AS grade
              FROM assignments a
              LEFT JOIN users u ON a.created_by = u.id
              LEFT JOIN courses c ON a.course_id = c.id
              LEFT JOIN submissions s ON a.id = s.assignment_id AND s.user_id = ?
-             WHERE a.course_id = ? AND a.is_active = 1
+             WHERE a.course_id = ? AND a.status = 'published'
              ORDER BY a.due_date ASC",
             [$userId, $courseId]
         );
     } else {
         $assignments = $db->fetchAll(
             "SELECT a.*, u.first_name, u.last_name, c.name as course_name,
-                    s.status as my_submission_status, s.submitted_at as my_submitted_at, s.grade
+                    s.status as my_submission_status, s.submitted_at as my_submitted_at, s.score AS grade
              FROM assignments a
              LEFT JOIN users u ON a.created_by = u.id
              LEFT JOIN courses c ON a.course_id = c.id
              LEFT JOIN course_enrollments ce ON a.course_id = ce.course_id AND ce.user_id = ?
              LEFT JOIN submissions s ON a.id = s.assignment_id AND s.user_id = ?
-             WHERE ce.user_id IS NOT NULL AND a.is_active = 1
+             WHERE ce.user_id IS NOT NULL AND a.status = 'published'
              ORDER BY a.due_date ASC",
             [$userId, $userId]
         );

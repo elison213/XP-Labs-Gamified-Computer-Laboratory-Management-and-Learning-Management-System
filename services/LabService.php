@@ -101,7 +101,7 @@ class LabService
      */
     public function createFloor(array $data): int
     {
-        return $this->db->insert('lab_floors', [
+        $payload = [
             'name' => $data['name'],
             'building' => $data['building'] ?? null,
             'floor_number' => $data['floor_number'] ?? 1,
@@ -109,7 +109,20 @@ class LabService
             'grid_rows' => $data['grid_rows'] ?? 5,
             'layout_config' => json_encode($data['layout_config'] ?? []),
             'is_active' => 1,
-        ]);
+        ];
+
+        // Optional: if lab_floors.lab_id exists (migration 033), persist it.
+        if (isset($data['lab_id'])) {
+            $hasLabId = (int) $this->db->fetchOne(
+                "SELECT COUNT(*) FROM information_schema.columns
+                 WHERE table_schema = DATABASE() AND table_name = 'lab_floors' AND column_name = 'lab_id'"
+            );
+            if ($hasLabId > 0) {
+                $payload['lab_id'] = (int) $data['lab_id'];
+            }
+        }
+
+        return $this->db->insert('lab_floors', $payload);
     }
 
     /**
@@ -260,8 +273,7 @@ class LabService
                 'grid_rows' => $gridRows,
                 'layout_config' => json_encode($layoutData['config'] ?? []),
             ], 'id = ?', [$floorId]);
-            
-            error_log("saveFloorLayout: floorId=$floorId, gridCols=$gridCols, gridRows=$gridRows, result=$result");
+            // Intentionally no verbose logging here; layout saves can be frequent.
 
             // Update stations - first clear all positions to avoid unique constraint conflicts
             if (!empty($layoutData['stations'])) {

@@ -5,11 +5,13 @@
 require_once __DIR__ . '/includes/bootstrap.php';
 
 use XPLabs\Lib\Auth;
+use XPLabs\Lib\Database;
 use XPLabs\Services\UserService;
 
 Auth::requireRole('admin');
 
 $userService = new UserService();
+$db = Database::getInstance();
 $page = max(1, (int) ($_GET['page'] ?? 1));
 $search = $_GET['search'] ?? '';
 $roleFilter = $_GET['role'] ?? '';
@@ -64,6 +66,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
                     $message = ['type' => 'danger', 'text' => 'File upload error'];
                 }
                 break;
+            case 'enroll_student_course':
+                $studentId = (int) ($_POST['user_id'] ?? 0);
+                $courseId = (int) ($_POST['course_id'] ?? 0);
+
+                $student = $db->fetch("SELECT id FROM users WHERE id = ? AND role = 'student'", [$studentId]);
+                $course = $db->fetch("SELECT id FROM courses WHERE id = ? AND status = 'active'", [$courseId]);
+                if (!$student || !$course) {
+                    throw new \RuntimeException('Invalid student or course selected.');
+                }
+
+                $existing = $db->fetch(
+                    "SELECT id FROM course_enrollments WHERE course_id = ? AND user_id = ?",
+                    [$courseId, $studentId]
+                );
+                if ($existing) {
+                    $db->update('course_enrollments', [
+                        'status' => 'enrolled',
+                        'enrolled_by' => Auth::id(),
+                        'enrolled_at' => date('Y-m-d H:i:s'),
+                        'completed_at' => null,
+                    ], 'id = ?', [$existing['id']]);
+                } else {
+                    $db->insert('course_enrollments', [
+                        'course_id' => $courseId,
+                        'user_id' => $studentId,
+                        'enrolled_by' => Auth::id(),
+                        'status' => 'enrolled',
+                    ]);
+                }
+                $message = ['type' => 'success', 'text' => 'Student enrolled to course successfully'];
+                break;
+            case 'assign_teacher_course':
+                $teacherId = (int) ($_POST['user_id'] ?? 0);
+                $courseId = (int) ($_POST['course_id'] ?? 0);
+
+                $teacher = $db->fetch("SELECT id FROM users WHERE id = ? AND role = 'teacher'", [$teacherId]);
+                $course = $db->fetch("SELECT id FROM courses WHERE id = ? AND status = 'active'", [$courseId]);
+                if (!$teacher || !$course) {
+                    throw new \RuntimeException('Invalid teacher or course selected.');
+                }
+
+                $db->update('courses', ['teacher_id' => $teacherId], 'id = ?', [$courseId]);
+                $message = ['type' => 'success', 'text' => 'Course assigned to teacher successfully'];
+                break;
         }
     } catch (\Exception $e) {
         $message = ['type' => 'danger', 'text' => $e->getMessage()];
@@ -72,6 +118,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
     // Refresh data
     $users = $userService->list($filters, $page);
 }
+
+$activeCourses = $db->fetchAll(
+    "SELECT id, code, name FROM courses WHERE status = 'active' ORDER BY name"
+);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -223,6 +273,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
                                 <th>Email</th>
                                 <th>Role</th>
                                 <th>Status</th>
+                                <th>Course</th>
                                 <th>Last Login</th>
                                 <th class="text-end">Actions</th>
                             </tr>
@@ -237,6 +288,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
                                 <td><?= e($user['email'] ?? '—') ?></td>
                                 <td><span class="role-badge <?= $user['role'] ?>"><?= ucfirst($user['role']) ?></span></td>
                                 <td><span class="status-badge <?= $user['is_active'] ? 'active' : 'inactive' ?>"><?= $user['is_active'] ? 'Active' : 'Inactive' ?></span></td>
+                                <td>
+                                    <?php if ($user['role'] === 'student'): ?>
+                                    <button class="btn btn-sm btn-outline-success"
+                                            onclick="openCourseModal(<?= (int) $user['id'] ?>, 'student', '<?= e($user['first_name'] . ' ' . $user['last_name']) ?>')">
+                                        Enroll
+                                    </button>
+                                    <?php elseif ($user['role'] === 'teacher'): ?>
+                                    <button class="btn btn-sm btn-outline-info"
+                                            onclick="openCourseModal(<?= (int) $user['id'] ?>, 'teacher', '<?= e($user['first_name'] . ' ' . $user['last_name']) ?>')">
+                                        Assign
+                                    </button>
+                                    <?php else: ?>
+                                    <span class="text-muted">—</span>
+                                    <?php endif; ?>
+                                </td>
                                 <td><?= $user['last_login'] ? date('M j, Y H:i', strtotime($user['last_login'])) : '<span class="text-muted">Never</span>' ?></td>
                                 <td class="text-end">
                                     <button class="btn btn-sm btn-outline-primary" onclick="editUser(<?= htmlspecialchars(json_encode($user)) ?>)">
@@ -255,7 +321,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
                             <?php endforeach; ?>
                             <?php if (empty($users['data'])): ?>
                             <tr>
-                                <td colspan="7" class="text-center text-muted py-4">No users found</td>
+                                <td colspan="8" class="text-center text-muted py-4">No users found</td>
                             </tr>
                             <?php endif; ?>
                         </tbody>
@@ -408,6 +474,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
         </div>
     </div>
 
+    <!-- Assign/Enroll Course Modal -->
+    <div class="modal fade" id="modalCourseAction" tabindex="-1">
+        <div class="modal-dialog">
+            <form method="POST" class="modal-content">
+                <?= csrf_field() ?>
+                <input type="hidden" name="action" id="course-action-type">
+                <input type="hidden" name="user_id" id="course-action-user-id">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="course-action-title">Course Assignment</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">User: <strong id="course-action-user-name"></strong></p>
+                    <div class="mb-3">
+                        <label class="form-label">Course</label>
+                        <select name="course_id" class="form-select" required>
+                            <option value="">Select course...</option>
+                            <?php foreach ($activeCourses as $course): ?>
+                            <option value="<?= (int) $course['id'] ?>"><?= e($course['code'] . ' - ' . $course['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <small class="text-muted" id="course-action-help"></small>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="course-action-submit">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
     function editUser(user) {
@@ -419,6 +517,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
         document.getElementById('edit-role').value = user.role;
         document.getElementById('edit-is-active').checked = user.is_active == 1;
         new bootstrap.Modal(document.getElementById('modalEdit')).show();
+    }
+
+    function openCourseModal(userId, userRole, userName) {
+        document.getElementById('course-action-user-id').value = userId;
+        document.getElementById('course-action-user-name').textContent = userName;
+
+        const isStudent = userRole === 'student';
+        document.getElementById('course-action-type').value = isStudent ? 'enroll_student_course' : 'assign_teacher_course';
+        document.getElementById('course-action-title').textContent = isStudent ? 'Enroll Student to Course' : 'Assign Course to Teacher';
+        document.getElementById('course-action-submit').textContent = isStudent ? 'Enroll Student' : 'Assign Course';
+        document.getElementById('course-action-help').textContent = isStudent
+            ? 'Only student-course enrollment is allowed in this action.'
+            : 'Assign this course to the selected teacher to avoid wrong quiz/course ownership.';
+
+        new bootstrap.Modal(document.getElementById('modalCourseAction')).show();
     }
     </script>
 </body>

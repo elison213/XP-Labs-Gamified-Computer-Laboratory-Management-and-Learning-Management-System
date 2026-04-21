@@ -73,6 +73,9 @@ $isAdmin = ($currentRole === 'admin');
         <?php endif; ?>
         
         <div class="nav-section">Academic</div>
+        <a href="courses.php" class="<?= $currentPage === 'courses.php' ? 'active' : '' ?>">
+            <i class="bi bi-journal-bookmark"></i> Courses
+        </a>
         <a href="assignments_manage.php" class="<?= $currentPage === 'assignments_manage.php' ? 'active' : '' ?>">
             <i class="bi bi-journal-text"></i> Assignments
         </a>

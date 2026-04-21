@@ -37,6 +37,8 @@ class Auth
         $sessionConfig = $config['session'] ?? [];
 
         if (session_status() === PHP_SESSION_NONE) {
+            $isHttps = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+            ini_set('session.cookie_secure', $isHttps ? '1' : ($sessionConfig['cookie_secure'] ? '1' : '0'));
             ini_set('session.cookie_httponly', $sessionConfig['cookie_httponly'] ? '1' : '0');
             ini_set('session.cookie_samesite', $sessionConfig['cookie_samesite'] ?? 'Lax');
             ini_set('session.use_strict_mode', '1');

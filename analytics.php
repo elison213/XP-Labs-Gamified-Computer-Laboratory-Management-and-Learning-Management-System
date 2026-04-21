@@ -13,11 +13,17 @@ $db = Database::getInstance();
 $userId = Auth::id();
 $role = $_SESSION['user_role'];
 
-// Get teacher's courses
-$teacherCourses = $db->fetchAll(
-    "SELECT id, name FROM courses WHERE teacher_id = ? AND status = 'active' ORDER BY name",
-    [$userId]
-);
+if ($role === 'teacher') {
+    $teacherCourses = $db->fetchAll(
+        "SELECT id, name FROM courses WHERE teacher_id = ? ORDER BY name",
+        [$userId]
+    );
+} else {
+    $teacherCourses = $db->fetchAll(
+        "SELECT id, name FROM courses ORDER BY name",
+        []
+    );
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">

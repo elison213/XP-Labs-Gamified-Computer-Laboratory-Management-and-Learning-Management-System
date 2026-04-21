@@ -624,6 +624,8 @@ $activeSessions = $db->fetchAll(
     </div>
 
     <script>
+    const KIOSK_FLOOR_ID = <?= json_encode($selectedFloor ?: null) ?>;
+
     // Clock
     function updateClock() {
         const now = new Date();
@@ -675,11 +677,14 @@ $activeSessions = $db->fetchAll(
         const pointsEl = document.getElementById('result-points');
 
         try {
-            const endpoint = currentMode === 'checkin' ? '/api/attendance/qr-checkin' : '/api/attendance/qr-checkout';
+            const endpoint = currentMode === 'checkin' ? '/api/kiosk/unlock' : '/api/attendance/qr-checkout';
+            const payload = currentMode === 'checkin'
+                ? { lrn, floor_id: KIOSK_FLOOR_ID }
+                : { lrn };
             const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ lrn })
+                body: JSON.stringify(payload)
             });
 
             const data = await response.json();
@@ -687,8 +692,15 @@ $activeSessions = $db->fetchAll(
             if (response.ok && data.success) {
                 resultEl.className = 'scan-result success';
                 nameEl.textContent = `✅ ${data.user?.first_name || ''} ${data.user?.last_name || ''}`;
-                msgEl.textContent = currentMode === 'checkin' ? 'Checked in successfully!' : 'Checked out successfully!';
-                pointsEl.textContent = data.points_earned ? `+${data.points_earned} points earned!` : '';
+                if (currentMode === 'checkin') {
+                    const pcName = data.pc?.hostname ? ` (${data.pc.hostname})` : '';
+                    msgEl.textContent = `Checked in successfully! Unlocking PC${pcName}...`;
+                    const points = data.attendance?.points_earned ?? 0;
+                    pointsEl.textContent = points ? `+${points} points earned!` : '';
+                } else {
+                    msgEl.textContent = 'Checked out successfully!';
+                    pointsEl.textContent = '';
+                }
 
                 // Highlight seat
                 if (currentMode === 'checkin' && data.user?.id) {

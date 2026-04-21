@@ -4,9 +4,11 @@
  * Autoloads classes and sets up the application environment.
  */
 
-// Error reporting
+// Error reporting (do not leak stack traces in production)
+$appConfig = require __DIR__ . '/../config/app.php';
+$debug = (bool) ($appConfig['debug'] ?? false);
 error_reporting(E_ALL);
-ini_set('display_errors', true);
+ini_set('display_errors', $debug ? '1' : '0');
 ini_set('log_errors', true);
 ini_set('error_log', __DIR__ . '/../storage/logs/error.log');
 

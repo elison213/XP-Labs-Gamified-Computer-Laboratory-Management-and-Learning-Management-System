@@ -331,13 +331,14 @@ $pcs = $db->fetchAll(
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+    const csrfToken = <?= json_encode(\csrf_token()) ?>;
     const teacherId = <?= json_encode(\XPLabs\Lib\Auth::id()) ?>;
 
     async function lockPC(pcId) {
         try {
             const res = await fetch('/api/lab/queue-command.php', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
                 body: JSON.stringify({ pc_id: pcId, command_type: 'lock', issued_by: teacherId })
             });
             const data = await res.json();
@@ -354,7 +355,7 @@ $pcs = $db->fetchAll(
         try {
             const res = await fetch('/api/lab/queue-command.php', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
                 body: JSON.stringify({ pc_id: pcId, command_type: 'unlock', issued_by: teacherId })
             });
             const data = await res.json();
@@ -380,7 +381,7 @@ $pcs = $db->fetchAll(
         try {
             const res = await fetch('/api/lab/queue-command.php', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
                 body: JSON.stringify({ pc_id: pcId, command_type: 'message', issued_by: teacherId, params: { message } })
             });
             const data = await res.json();
@@ -399,7 +400,7 @@ $pcs = $db->fetchAll(
         try {
             const res = await fetch('/api/session/force-logout.php', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
                 body: JSON.stringify({ user_id: userId, lrn })
             });
             const data = await res.json();
@@ -417,7 +418,7 @@ $pcs = $db->fetchAll(
         try {
             const res = await fetch('/api/lab/queue-command.php', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
                 body: JSON.stringify({ pc_id: 'all', command_type: 'lock', issued_by: teacherId })
             });
             const data = await res.json();
@@ -434,7 +435,7 @@ $pcs = $db->fetchAll(
         try {
             const res = await fetch('/api/lab/queue-command.php', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
                 body: JSON.stringify({ pc_id: 'all', command_type: 'unlock', issued_by: teacherId })
             });
             const data = await res.json();

@@ -29,6 +29,10 @@ if ($courseId) {
     $where[] = 'a.course_id = ?';
     $params[] = $courseId;
 }
+if ($statusFilter !== '') {
+    $where[] = 's.status = ?';
+    $params[] = $statusFilter;
+}
 
 if ($role === 'teacher') {
     $where[] = 'a.created_by = ?';

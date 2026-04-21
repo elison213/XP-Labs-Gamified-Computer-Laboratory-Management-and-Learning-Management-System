@@ -94,10 +94,21 @@ $recentAwards = $db->fetchAll(
             <div class="col-lg-5">
                 <div class="xp-card">
                     <div class="card-header">
-                        <h5><i class="bi bi-gift me-2"></i>Give Award</h5>
+                        <h5><i class="bi bi-gift me-2"></i>Adjust Points</h5>
                     </div>
                     <div class="card-body">
                         <form id="awardForm">
+                            <!-- Mode -->
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Action</label>
+                                <div class="d-flex gap-2">
+                                    <input type="radio" class="btn-check" name="mode" id="modeAward" value="award" checked>
+                                    <label class="btn btn-outline-success" for="modeAward"><i class="bi bi-plus-circle me-1"></i>Award</label>
+
+                                    <input type="radio" class="btn-check" name="mode" id="modeDeduct" value="deduct">
+                                    <label class="btn btn-outline-danger" for="modeDeduct"><i class="bi bi-dash-circle me-1"></i>Deduct</label>
+                                </div>
+                            </div>
                             <!-- Student Selection -->
                             <div class="mb-3">
                                 <label class="form-label fw-semibold">Select Student</label>
@@ -117,11 +128,11 @@ $recentAwards = $db->fetchAll(
                             <div class="mb-3">
                                 <label class="form-label fw-semibold">Points</label>
                                 <div class="d-flex gap-2 flex-wrap">
-                                    <button type="button" class="point-btn" data-points="5">+5</button>
-                                    <button type="button" class="point-btn" data-points="10">+10</button>
-                                    <button type="button" class="point-btn" data-points="25">+25</button>
-                                    <button type="button" class="point-btn" data-points="50">+50</button>
-                                    <button type="button" class="point-btn" data-points="100">+100</button>
+                                    <button type="button" class="point-btn" data-points="5">5</button>
+                                    <button type="button" class="point-btn" data-points="10">10</button>
+                                    <button type="button" class="point-btn" data-points="25">25</button>
+                                    <button type="button" class="point-btn" data-points="50">50</button>
+                                    <button type="button" class="point-btn" data-points="100">100</button>
                                 </div>
                                 <input type="number" name="points" id="customPoints" class="form-control mt-2" placeholder="Or enter custom amount" min="1">
                             </div>
@@ -146,7 +157,7 @@ $recentAwards = $db->fetchAll(
                             </div>
 
                             <button type="submit" class="btn btn-primary w-100">
-                                <i class="bi bi-check-circle me-1"></i> Award Points
+                                <i class="bi bi-check-circle me-1"></i> Submit
                             </button>
                         </form>
                     </div>
@@ -166,7 +177,11 @@ $recentAwards = $db->fetchAll(
                                 <div>
                                     <div class="fw-semibold">
                                         <?= e($award['student_first'] . ' ' . $award['student_last']) ?>
-                                        <span class="text-success ms-2">+<?= $award['points'] ?> pts</span>
+                                        <?php if ((int)$award['points'] >= 0): ?>
+                                            <span class="text-success ms-2">+<?= (int)$award['points'] ?> pts</span>
+                                        <?php else: ?>
+                                            <span class="text-danger ms-2"><?= (int)$award['points'] ?> pts</span>
+                                        <?php endif; ?>
                                     </div>
                                     <div class="text-muted small"><?= e($award['reason']) ?></div>
                                     <div class="mt-1">
@@ -192,6 +207,7 @@ $recentAwards = $db->fetchAll(
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+    const csrfToken = <?= json_encode(csrf_token()) ?>;
     // Student selection
     document.querySelectorAll('.student-item').forEach(item => {
         item.addEventListener('click', function() {
@@ -245,10 +261,16 @@ $recentAwards = $db->fetchAll(
         try {
             const response = await fetch('api/awards/create.php', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
                 body: JSON.stringify(data)
             });
-            const result = await response.json();
+            const text = await response.text();
+            let result = {};
+            try {
+                result = text ? JSON.parse(text) : {};
+            } catch (parseError) {
+                result = { error: text || 'Invalid server response' };
+            }
             
             if (response.ok && result.success) {
                 alert(result.message);
@@ -257,7 +279,7 @@ $recentAwards = $db->fetchAll(
                 alert('Error: ' + (result.error || 'Unknown error'));
             }
         } catch (err) {
-            alert('Network error');
+            alert('Network error: unable to reach server');
         }
     });
     </script>

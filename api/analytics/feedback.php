@@ -15,6 +15,7 @@ Auth::requireRole(['admin', 'teacher']);
 
 $db = Database::getInstance();
 $userId = Auth::id();
+$role = Auth::role();
 $courseId = (int) ($_GET['course_id'] ?? 0);
 
 // Build where clause
@@ -22,12 +23,33 @@ $where = "1=1";
 $params = [];
 
 if ($courseId) {
-    if ($activity_type === 'quiz') {
-        $where .= " AND af.activity_id IN (SELECT id FROM quizzes WHERE course_id = ?)";
-    } elseif ($activity_type === 'assignment') {
-        $where .= " AND af.activity_id IN (SELECT id FROM assignments WHERE course_id = ?)";
+    if ($role === 'teacher') {
+        $owned = (int) $db->fetchOne("SELECT COUNT(*) FROM courses WHERE id = ? AND teacher_id = ?", [$courseId, $userId]);
+        if ($owned === 0) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Invalid course access']);
+            exit;
+        }
     }
+    $where .= " AND (
+        (af.activity_type = 'quiz' AND af.activity_id IN (SELECT id FROM quizzes WHERE course_id = ?))
+        OR
+        (af.activity_type = 'assignment' AND af.activity_id IN (SELECT id FROM assignments WHERE course_id = ?))
+        OR
+        (af.activity_type = 'lab_session')
+    )";
     $params[] = $courseId;
+    $params[] = $courseId;
+} elseif ($role === 'teacher') {
+    $where .= " AND (
+        (af.activity_type = 'quiz' AND af.activity_id IN (SELECT id FROM quizzes WHERE course_id IN (SELECT id FROM courses WHERE teacher_id = ?)))
+        OR
+        (af.activity_type = 'assignment' AND af.activity_id IN (SELECT id FROM assignments WHERE course_id IN (SELECT id FROM courses WHERE teacher_id = ?)))
+        OR
+        (af.activity_type = 'lab_session')
+    )";
+    $params[] = $userId;
+    $params[] = $userId;
 }
 
 // Fun rating distribution (1-5 stars)

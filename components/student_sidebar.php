@@ -12,6 +12,9 @@
         </a>
         
         <div class="nav-section">Learning</div>
+        <a href="courses.php" class="<?= basename($_SERVER['PHP_SELF']) === 'courses.php' ? 'active' : '' ?>">
+            <i class="bi bi-journal-bookmark"></i> Courses
+        </a>
         <a href="assignments.php" class="<?= basename($_SERVER['PHP_SELF']) === 'assignments.php' ? 'active' : '' ?>">
             <i class="bi bi-journal-text"></i> Assignments
         </a>

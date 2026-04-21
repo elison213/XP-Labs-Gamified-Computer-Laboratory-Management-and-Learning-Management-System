@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 Auth::require();
 
-$input = json_decode(file_get_contents('php://input'), true);
+$input = json_decode(file_get_contents('php://input'), true) ?? [];
 $attemptId = (int) ($input['attempt_id'] ?? 0);
 $questionId = (int) ($input['question_id'] ?? 0);
 $answer = $input['answer'] ?? null;
@@ -33,12 +33,17 @@ if (!$attemptId || !$questionId || $answer === null) {
     exit;
 }
 
-$quizService = new QuizService();
-$result = $quizService->submitAnswer($attemptId, $questionId, $answer, $powerupId);
+try {
+    $quizService = new QuizService();
+    $result = $quizService->submitAnswer($attemptId, $questionId, $answer, $powerupId);
 
-if ($result['success']) {
-    echo json_encode($result);
-} else {
-    http_response_code(400);
-    echo json_encode(['error' => $result['message']]);
+    if ($result['success']) {
+        echo json_encode($result);
+    } else {
+        http_response_code(400);
+        echo json_encode(['error' => $result['message']]);
+    }
+} catch (\Throwable $e) {
+    http_response_code(500);
+    echo json_encode(['error' => 'Failed to submit answer']);
 }

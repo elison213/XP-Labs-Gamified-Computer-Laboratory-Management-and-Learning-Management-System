@@ -16,11 +16,15 @@ $labService = new LabService();
 $floors = $labService->getFloors();
 $stations = $labService->getStations();
 $stats = $labService->getStats();
-$adStats = [
-    'computers' => $db->query("SELECT COUNT(*) AS cnt FROM ad_computers")->fetchColumn(),
-    'users' => $db->query("SELECT COUNT(*) AS cnt FROM ad_users")->fetchColumn(),
-    'groups' => $db->query("SELECT COUNT(*) AS cnt FROM ad_groups")->fetchColumn()
-];
+if ($db->tableExists('ad_computers')) {
+    $adStats = [
+        'computers' => (int) $db->fetchOne("SELECT COUNT(*) FROM ad_computers"),
+        'users' => (int) $db->fetchOne("SELECT COUNT(*) FROM ad_users"),
+        'groups' => (int) $db->fetchOne("SELECT COUNT(*) FROM ad_groups"),
+    ];
+} else {
+    $adStats = ['computers' => 0, 'users' => 0, 'groups' => 0];
+}
 
 // Group stations by floor
 $stationsByFloor = [];

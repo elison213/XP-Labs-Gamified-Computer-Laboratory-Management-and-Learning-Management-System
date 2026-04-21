@@ -356,6 +356,13 @@ $floors = $labService->getFloors();
                                 <small class="text-muted">Bulk upload via CSV/Excel</small>
                             </div>
                         </a>
+                        <a href="course_enrollments.php" class="quick-action">
+                            <i class="bi bi-people"></i>
+                            <div>
+                                <div class="fw-semibold">Course Enrollments</div>
+                                <small class="text-muted">Assign students to courses</small>
+                            </div>
+                        </a>
                         <a href="admin_system.php" class="quick-action">
                             <i class="bi bi-pc-display"></i>
                             <div>

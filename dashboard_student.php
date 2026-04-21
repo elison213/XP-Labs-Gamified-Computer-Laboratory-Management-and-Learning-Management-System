@@ -361,32 +361,54 @@ $leaderboardPos = $db->fetchOne(
     <?php include __DIR__ . '/components/student_sidebar.php'; ?>
 
     <!-- Main Content -->
-    <div class="main-content">
-        <!-- Profile Header -->
-        <div class="profile-header">
-            <div class="d-flex align-items-center gap-3">
-                <div class="profile-avatar">
-                    <?= strtoupper(substr($user['first_name'] ?? 'S', 0, 1)) ?>
-                </div>
-                <div>
-                    <div class="profile-name"><?= e($user['first_name'] . ' ' . $user['last_name']) ?></div>
-                    <div class="profile-detail">
-                        <?= e($user['grade_level'] ?? '') ?> - <?= e($user['section'] ?? '') ?> | LRN: <?= e($user['lrn']) ?>
+        <div class="main-content">
+            <!-- Profile Header -->
+            <div class="profile-header">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="profile-avatar">
+                        <?= strtoupper(substr($user['first_name'] ?? 'S', 0, 1)) ?>
+                    </div>
+                    <div>
+                        <div class="profile-name"><?= e($user['first_name'] . ' ' . $user['last_name']) ?></div>
+                        <div class="profile-detail">
+                            <?= e($user['grade_level'] ?? '') ?> - <?= e($user['section'] ?? '') ?> | LRN: <?= e($user['lrn']) ?>
+                        </div>
+                    </div>
+                    <div class="ms-auto text-end">
+                        <div class="profile-detail">Current Rank</div>
+                        <div class="profile-name">#<?= e($leaderboardPos) ?></div>
                     </div>
                 </div>
-                <div class="ms-auto text-end">
-                    <div class="profile-detail">Current Rank</div>
-                    <div class="profile-name">#<?= e($leaderboardPos) ?></div>
-                </div>
             </div>
-        </div>
+            <!-- Quick Navigation Buttons (Story S_D3) -->
+            <div class="d-flex flex-wrap gap-2 justify-content-center my-3">
+                <a href="assignments.php" class="btn btn-primary"><i class="bi bi-journal-text me-1"></i>Assignments</a>
+                <a href="my_quizzes.php" class="btn btn-success"><i class="bi bi-question-circle me-1"></i>Quizzes</a>
+                <a href="profile_student.php" class="btn btn-info"><i class="bi bi-person me-1"></i>My Profile</a>
+                <a href="leaderboard.php" class="btn btn-warning"><i class="bi bi-trophy me-1"></i>Leaderboard</a>
+            </div>
 
         <!-- Stats Grid -->
-        <div class="stats-grid">
+            <div class="stats-grid">
             <div class="stat-box accent">
                 <div class="value"><?= number_format($points) ?></div>
                 <div class="label">Total Points</div>
             </div>
+            <!-- Upcoming Deadlines (Story S_D2) -->
+            <?php if (!empty($activeAssignments)): ?>
+            <h5 class="mt-4 mb-3">Upcoming Deadlines</h5>
+            <div class="list-group">
+                <?php foreach ($activeAssignments as $assignment): ?>
+                <a href="assignments.php" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="fw-semibold"><?= e($assignment['title']) ?></div>
+                        <small class="text-muted"><?= e($assignment['course_name']) ?></small>
+                    </div>
+                    <span class="badge bg-danger">Due <?= date('M j', strtotime($assignment['due_date'])) ?></span>
+                </a>
+                <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
             <div class="stat-box green">
                 <div class="value"><?= count($achievements) ?></div>
                 <div class="label">Achievements</div>

@@ -17,9 +17,19 @@ require_once __DIR__ . '/../../lib/Database.php';
 
 use XPLabs\Lib\Auth;
 
+// #region agent log
+$__debugLog = static function (string $runId, string $hypothesisId, string $location, string $message, array $data = []): void {
+    file_put_contents(__DIR__ . '/../../debug-10ea95.log', json_encode(['sessionId' => '10ea95', 'runId' => $runId, 'hypothesisId' => $hypothesisId, 'location' => $location, 'message' => $message, 'data' => $data, 'timestamp' => (int) round(microtime(true) * 1000)], JSON_UNESCAPED_SLASHES) . PHP_EOL, FILE_APPEND);
+};
+// #endregion
+
 $input = json_decode(file_get_contents('php://input'), true);
 $lrn = trim($input['lrn'] ?? '');
 $password = trim($input['password'] ?? '');
+
+// #region agent log
+$__debugLog('initial', 'H1', 'api/auth/login.php:27', 'login_request_received', ['has_lrn' => $lrn !== '', 'has_password' => $password !== '', 'content_type' => $_SERVER['CONTENT_TYPE'] ?? null, 'script_name' => $_SERVER['SCRIPT_NAME'] ?? null]);
+// #endregion
 
 if (empty($lrn) || empty($password)) {
     http_response_code(400);
@@ -73,7 +83,13 @@ if ($auth->login($user['id'], $user['role'])) {
         ],
         'redirect' => $baseUrl . $redirectPath,
     ]);
+    // #region agent log
+    $__debugLog('initial', 'H1', 'api/auth/login.php:81', 'login_success', ['role' => $user['role'], 'redirect' => $baseUrl . $redirectPath]);
+    // #endregion
 } else {
     http_response_code(500);
+    // #region agent log
+    $__debugLog('initial', 'H1', 'api/auth/login.php:85', 'login_failed_after_password_verify', ['user_id' => (int) $user['id'], 'role' => $user['role']]);
+    // #endregion
     echo json_encode(['error' => 'Login failed']);
 }

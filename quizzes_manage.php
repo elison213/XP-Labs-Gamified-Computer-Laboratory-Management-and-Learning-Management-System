@@ -15,6 +15,28 @@ $role = $_SESSION['user_role'];
 $userId = Auth::id();
 $quizService = new QuizService();
 
+// Backward-compatible schema guard for environments where migration 042 has not run yet.
+$hasShowResultsImmediately = (int) $db->fetchOne(
+    "SELECT COUNT(*) FROM information_schema.columns
+     WHERE table_schema = DATABASE()
+       AND table_name = 'quizzes'
+       AND column_name = 'show_results_immediately'"
+) > 0;
+if (!$hasShowResultsImmediately) {
+    $db->query("ALTER TABLE quizzes ADD COLUMN show_results_immediately TINYINT(1) DEFAULT 1 AFTER allow_powerups");
+    $hasShowResultsImmediately = true;
+}
+$hasMaxAttempts = (int) $db->fetchOne(
+    "SELECT COUNT(*) FROM information_schema.columns
+     WHERE table_schema = DATABASE()
+       AND table_name = 'quizzes'
+       AND column_name = 'max_attempts'"
+) > 0;
+if (!$hasMaxAttempts) {
+    $db->query("ALTER TABLE quizzes ADD COLUMN max_attempts INT DEFAULT 1 AFTER time_limit_per_q");
+    $hasMaxAttempts = true;
+}
+
 // Handle POST actions
 $message = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
@@ -28,8 +50,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
                 $db->delete('quizzes', 'id = ?', [$quizId]);
                 $message = ['type' => 'success', 'text' => 'Quiz deleted successfully'];
                 break;
+            case 'update_quiz':
+                $quizId = (int) ($_POST['quiz_id'] ?? 0);
+                $quiz = $db->fetch(
+                    $role === 'teacher'
+                        ? "SELECT * FROM quizzes WHERE id = ? AND created_by = ?"
+                        : "SELECT * FROM quizzes WHERE id = ?",
+                    $role === 'teacher' ? [$quizId, $userId] : [$quizId]
+                );
+                if (!$quiz) {
+                    throw new \RuntimeException('Quiz not found or access denied.');
+                }
+
+                $questions = json_decode((string) ($_POST['questions_json'] ?? '[]'), true);
+                $questions = is_array($questions) ? $questions : [];
+                if (empty($questions)) {
+                    throw new \RuntimeException('Please provide at least one valid question.');
+                }
+
+                $db->beginTransaction();
+                $db->update('quizzes', [
+                    'title' => trim($_POST['title'] ?? ''),
+                    'description' => trim($_POST['description'] ?? '') ?: null,
+                    'time_limit_per_q' => max(5, (int) ($_POST['time_limit_per_q'] ?? 30)),
+                    'max_attempts' => max(1, (int) ($_POST['max_attempts'] ?? 1)),
+                    'scheduled_at' => !empty($_POST['scheduled_at']) ? $_POST['scheduled_at'] : null,
+                    'closes_at' => !empty($_POST['closes_at']) ? $_POST['closes_at'] : null,
+                    'show_results_immediately' => isset($_POST['show_results_immediately']) ? 1 : 0,
+                    'status' => $_POST['status'] ?? 'draft',
+                ], 'id = ?', [$quizId]);
+
+                $db->delete('quiz_questions', 'quiz_id = ?', [$quizId]);
+                $number = 1;
+                foreach ($questions as $q) {
+                    $quizService->addQuestion($quizId, [
+                        'question_number' => $number++,
+                        'question_text' => $q['question_text'],
+                        'type' => $q['type'],
+                        'correct_answer' => $q['correct_answer'],
+                        'points' => $q['points'],
+                        'options' => $q['options'],
+                    ]);
+                }
+                $db->commit();
+                $message = ['type' => 'success', 'text' => 'Quiz updated successfully'];
+                break;
         }
     } catch (\Exception $e) {
+        if ($db->getConnection()->inTransaction()) {
+            $db->rollback();
+        }
         $message = ['type' => 'danger', 'text' => $e->getMessage()];
     }
 }
@@ -75,6 +145,38 @@ $quizzes = $db->fetchAll(
      ORDER BY q.created_at DESC",
     $params
 );
+
+$editingQuiz = null;
+$editingQuestionsJson = '[]';
+$editQuizId = (int) ($_GET['edit_quiz_id'] ?? 0);
+if ($editQuizId > 0) {
+    $editingQuiz = $db->fetch(
+        $role === 'teacher'
+            ? "SELECT * FROM quizzes WHERE id = ? AND created_by = ?"
+            : "SELECT * FROM quizzes WHERE id = ?",
+        $role === 'teacher' ? [$editQuizId, $userId] : [$editQuizId]
+    );
+    if ($editingQuiz) {
+        $editQuestions = $db->fetchAll(
+            "SELECT * FROM quiz_questions WHERE quiz_id = ? ORDER BY question_number ASC",
+            [$editQuizId]
+        );
+        $rows = [];
+        foreach ($editQuestions as $q) {
+            $opts = json_decode((string) ($q['options'] ?? ''), true);
+            $correctRaw = $q['correct_answer'];
+            $correctDecoded = is_string($correctRaw) ? json_decode($correctRaw, true) : null;
+            $rows[] = [
+                'question_text' => $q['question_text'],
+                'type' => $q['type'],
+                'correct_answer' => (json_last_error() === JSON_ERROR_NONE) ? $correctDecoded : $correctRaw,
+                'points' => (int) $q['points'],
+                'options' => is_array($opts) ? $opts : null,
+            ];
+        }
+        $editingQuestionsJson = json_encode($rows, JSON_UNESCAPED_UNICODE);
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -226,7 +328,8 @@ $quizzes = $db->fetchAll(
                             <option value="">All Status</option>
                             <option value="draft" <?= $statusFilter === 'draft' ? 'selected' : '' ?>>Draft</option>
                             <option value="active" <?= $statusFilter === 'active' ? 'selected' : '' ?>>Active</option>
-                            <option value="closed" <?= $statusFilter === 'closed' ? 'selected' : '' ?>>Closed</option>
+                            <option value="completed" <?= $statusFilter === 'completed' ? 'selected' : '' ?>>Completed</option>
+                            <option value="archived" <?= $statusFilter === 'archived' ? 'selected' : '' ?>>Archived</option>
                         </select>
                     </div>
                     <div class="col-md-2">
@@ -254,9 +357,9 @@ $quizzes = $db->fetchAll(
                                 <th>Course</th>
                                 <th>Questions</th>
                                 <th>Attempts</th>
-                                <th>Duration</th>
+                                <th>Per Question</th>
                                 <th>Status</th>
-                                <th>Start Time</th>
+                                <th>Schedule</th>
                                 <th class="text-end">Actions</th>
                             </tr>
                         </thead>
@@ -270,10 +373,13 @@ $quizzes = $db->fetchAll(
                                 <td><?= e($q['course_name'] ?? '-') ?></td>
                                 <td><?= $q['question_count'] ?></td>
                                 <td><?= $q['attempt_count'] ?></td>
-                                <td><?= $q['time_limit_minutes'] ?> min</td>
+                                <td><?= (int) ($q['time_limit_per_q'] ?? 30) ?> sec</td>
                                 <td><span class="status-pill <?= $q['status'] ?>"><?= ucfirst($q['status']) ?></span></td>
-                                <td><?= $q['start_time'] ? date('M j, H:i', strtotime($q['start_time'])) : '-' ?></td>
+                                <td><?= $q['scheduled_at'] ? date('M j, H:i', strtotime($q['scheduled_at'])) : '-' ?></td>
                                 <td class="text-end">
+                                    <a href="quizzes_manage.php?edit_quiz_id=<?= $q['id'] ?>" class="btn btn-sm btn-outline-primary" title="Edit">
+                                        <i class="bi bi-pencil-square"></i>
+                                    </a>
                                     <a href="quiz_results.php?quiz_id=<?= $q['id'] ?>" class="btn btn-sm btn-outline-secondary" title="Results">
                                         <i class="bi bi-bar-chart"></i>
                                     </a>
@@ -303,7 +409,7 @@ $quizzes = $db->fetchAll(
     <!-- Create Quiz Modal -->
     <div class="modal fade" id="modalQuiz" tabindex="-1">
         <div class="modal-dialog modal-lg">
-            <form action="api/quizzes/create.php" method="POST" class="modal-content">
+            <form id="createQuizForm" class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Create Quiz</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -328,39 +434,429 @@ $quizzes = $db->fetchAll(
                             <textarea name="description" class="form-control" rows="2"></textarea>
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label">Time Limit (minutes)</label>
-                            <input type="number" name="time_limit_minutes" class="form-control" value="30" min="1">
+                            <label class="form-label">Time Per Question (seconds)</label>
+                            <input type="number" name="time_limit_per_q" class="form-control" value="30" min="5">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Max Attempts</label>
+                            <input type="number" name="max_attempts" class="form-control" value="1" min="1">
                         </div>
                         <div class="col-md-3">
                             <label class="form-label">Start Time</label>
-                            <input type="datetime-local" name="start_time" class="form-control">
+                            <input type="datetime-local" name="scheduled_at" class="form-control">
                         </div>
                         <div class="col-md-3">
                             <label class="form-label">End Time</label>
-                            <input type="datetime-local" name="end_time" class="form-control">
+                            <input type="datetime-local" name="closes_at" class="form-control">
                         </div>
                         <div class="col-md-3">
                             <label class="form-label">Status</label>
                             <select name="status" class="form-select">
                                 <option value="draft" selected>Draft</option>
                                 <option value="active">Active</option>
-                                <option value="closed">Closed</option>
+                                <option value="scheduled">Scheduled</option>
                             </select>
                         </div>
-                        <div class="col-12">
-                            <label class="form-label">Questions (one per line, format: Question|A|B|C|D|correct_letter)</label>
-                            <textarea name="questions" class="form-control" rows="6" placeholder="What is 2+2?|3|4|5|6|B&#10;What is PHP?|Language|Framework|Database|Server|A"></textarea>
+                        <div class="col-md-4">
+                            <div class="form-check mt-4 pt-1">
+                                <input class="form-check-input" type="checkbox" id="create-show-results" name="show_results_immediately" value="1" checked>
+                                <label class="form-check-label" for="create-show-results">
+                                    Show results immediately
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-12 mt-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <label class="form-label mb-0">Questions</label>
+                                <button type="button" class="btn btn-sm btn-outline-primary" id="addQuestionBtn">
+                                    <i class="bi bi-plus-lg me-1"></i>Add Question
+                                </button>
+                            </div>
+                            <div class="text-muted small mb-2">Supports multiple choice, true/false, short answer, code completion, and output prediction.</div>
+                            <div id="questionList" class="d-flex flex-column gap-3"></div>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Create Quiz</button>
+                    <button type="submit" class="btn btn-primary" id="createQuizSubmitBtn">Create Quiz</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Quiz Modal -->
+    <div class="modal fade" id="modalEditQuiz" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <form method="POST" id="editQuizForm" class="modal-content">
+                <?= csrf_field() ?>
+                <input type="hidden" name="action" value="update_quiz">
+                <input type="hidden" name="quiz_id" value="<?= (int) ($editingQuiz['id'] ?? 0) ?>">
+                <input type="hidden" name="questions_json" id="edit-questions-json" value="">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Quiz</h5>
+                    <a href="quizzes_manage.php" class="btn-close"></a>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label">Quiz Title *</label>
+                            <input type="text" name="title" class="form-control" required value="<?= e($editingQuiz['title'] ?? '') ?>">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Time Per Question (seconds)</label>
+                            <input type="number" name="time_limit_per_q" class="form-control" min="5" value="<?= (int) ($editingQuiz['time_limit_per_q'] ?? 30) ?>">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Max Attempts</label>
+                            <input type="number" name="max_attempts" class="form-control" min="1" value="<?= (int) ($editingQuiz['max_attempts'] ?? 1) ?>">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Start Time</label>
+                            <input type="datetime-local" name="scheduled_at" class="form-control" value="<?= !empty($editingQuiz['scheduled_at']) ? date('Y-m-d\TH:i', strtotime($editingQuiz['scheduled_at'])) : '' ?>">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">End Time</label>
+                            <input type="datetime-local" name="closes_at" class="form-control" value="<?= !empty($editingQuiz['closes_at']) ? date('Y-m-d\TH:i', strtotime($editingQuiz['closes_at'])) : '' ?>">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Status</label>
+                            <select name="status" class="form-select">
+                                <?php $statuses = ['draft', 'scheduled', 'active', 'completed', 'archived']; ?>
+                                <?php foreach ($statuses as $s): ?>
+                                <option value="<?= $s ?>" <?= (($editingQuiz['status'] ?? '') === $s) ? 'selected' : '' ?>><?= ucfirst($s) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="form-check mt-4 pt-1">
+                                <input class="form-check-input" type="checkbox" id="edit-show-results" name="show_results_immediately" value="1" <?= ((int) ($editingQuiz['show_results_immediately'] ?? 1) === 1) ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="edit-show-results">
+                                    Show results immediately to students
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Description</label>
+                            <textarea name="description" class="form-control" rows="2"><?= e($editingQuiz['description'] ?? '') ?></textarea>
+                        </div>
+                        <div class="col-12 mt-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <label class="form-label mb-0">Questions</label>
+                                <button type="button" class="btn btn-sm btn-outline-primary" id="editAddQuestionBtn">
+                                    <i class="bi bi-plus-lg me-1"></i>Add Question
+                                </button>
+                            </div>
+                            <div class="text-muted small mb-2">Use the same question builder UI as Create Quiz.</div>
+                            <div id="editQuestionList" class="d-flex flex-column gap-3"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <a href="quizzes_manage.php" class="btn btn-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-primary">Save Quiz</button>
                 </div>
             </form>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    (function () {
+        const csrfToken = <?= json_encode(csrf_token()) ?>;
+        const form = document.getElementById('createQuizForm');
+        const questionList = document.getElementById('questionList');
+        const addQuestionBtn = document.getElementById('addQuestionBtn');
+        const submitBtn = document.getElementById('createQuizSubmitBtn');
+        const modalEl = document.getElementById('modalQuiz');
+
+        function buildAnswerFields(type, card) {
+            const container = card.querySelector('.answer-config');
+            if (type === 'multiple_choice') {
+                container.innerHTML = `
+                    <div class="row g-2">
+                        <div class="col-md-6"><input class="form-control option-input" placeholder="Option A"></div>
+                        <div class="col-md-6"><input class="form-control option-input" placeholder="Option B"></div>
+                        <div class="col-md-6"><input class="form-control option-input" placeholder="Option C"></div>
+                        <div class="col-md-6"><input class="form-control option-input" placeholder="Option D"></div>
+                        <div class="col-md-6">
+                            <label class="form-label small">Correct Option</label>
+                            <select class="form-select correct-option">
+                                <option value="0">A</option>
+                                <option value="1">B</option>
+                                <option value="2">C</option>
+                                <option value="3">D</option>
+                            </select>
+                        </div>
+                    </div>`;
+                return;
+            }
+            if (type === 'true_false') {
+                container.innerHTML = `
+                    <label class="form-label small">Correct Answer</label>
+                    <select class="form-select correct-bool">
+                        <option value="true">True</option>
+                        <option value="false">False</option>
+                    </select>`;
+                return;
+            }
+            container.innerHTML = `
+                <label class="form-label small">Correct Answer</label>
+                <input type="text" class="form-control correct-text" placeholder="Enter correct answer">`;
+        }
+
+        function addQuestionCard() {
+            const idx = questionList.children.length + 1;
+            const card = document.createElement('div');
+            card.className = 'border rounded p-3';
+            card.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <strong>Question ${idx}</strong>
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-question">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small">Question Text</label>
+                    <textarea class="form-control question-text" rows="2" required></textarea>
+                </div>
+                <div class="row g-2 mb-2">
+                    <div class="col-md-6">
+                        <label class="form-label small">Question Type</label>
+                        <select class="form-select question-type">
+                            <option value="multiple_choice">Multiple Choice</option>
+                            <option value="true_false">True / False</option>
+                            <option value="short_answer">Short Answer</option>
+                            <option value="code_completion">Code Completion</option>
+                            <option value="output_prediction">Output Prediction</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small">Points</label>
+                        <input type="number" class="form-control question-points" min="1" value="10">
+                    </div>
+                </div>
+                <div class="answer-config"></div>`;
+
+            questionList.appendChild(card);
+            buildAnswerFields('multiple_choice', card);
+
+            card.querySelector('.question-type').addEventListener('change', function () {
+                buildAnswerFields(this.value, card);
+            });
+            card.querySelector('.remove-question').addEventListener('click', function () {
+                card.remove();
+                [...questionList.children].forEach((item, i) => {
+                    item.querySelector('strong').textContent = `Question ${i + 1}`;
+                });
+            });
+        }
+
+        addQuestionBtn.addEventListener('click', addQuestionCard);
+        addQuestionCard();
+
+        form.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Creating...';
+
+            const payload = {
+                title: form.title.value.trim(),
+                course_id: parseInt(form.course_id.value, 10),
+                description: form.description.value.trim(),
+                time_limit_per_q: parseInt(form.time_limit_per_q.value || '30', 10),
+                max_attempts: parseInt(form.max_attempts.value || '1', 10),
+                scheduled_at: form.scheduled_at.value || null,
+                closes_at: form.closes_at.value || null,
+                shuffle_questions: 0,
+                shuffle_answers: 1,
+                show_live_leaderboard: 1,
+                allow_powerups: 1,
+                show_results_immediately: form.show_results_immediately?.checked ? 1 : 0,
+                publish: form.status.value === 'active',
+                questions: []
+            };
+
+            for (const card of questionList.children) {
+                const type = card.querySelector('.question-type').value;
+                const question = {
+                    question_text: card.querySelector('.question-text').value.trim(),
+                    type: type,
+                    points: parseInt(card.querySelector('.question-points').value || '10', 10)
+                };
+                if (!question.question_text) continue;
+
+                if (type === 'multiple_choice') {
+                    const options = [...card.querySelectorAll('.option-input')].map(el => el.value.trim()).filter(Boolean);
+                    if (options.length < 2) continue;
+                    const correctIdx = parseInt(card.querySelector('.correct-option').value, 10);
+                    question.options = options;
+                    question.correct_answer = options[correctIdx] ?? options[0];
+                } else if (type === 'true_false') {
+                    question.options = ['true', 'false'];
+                    question.correct_answer = card.querySelector('.correct-bool').value;
+                } else {
+                    question.correct_answer = card.querySelector('.correct-text')?.value.trim() || '';
+                }
+
+                payload.questions.push(question);
+            }
+
+            if (!payload.title || !payload.course_id || payload.questions.length === 0) {
+                alert('Please provide quiz title, course, and at least one valid question.');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Create Quiz';
+                return;
+            }
+
+            try {
+                const resp = await fetch('api/quizzes/create.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+                    body: JSON.stringify(payload)
+                });
+                const text = await resp.text();
+                let result = {};
+                try {
+                    result = text ? JSON.parse(text) : {};
+                } catch (parseErr) {
+                    result = { error: text || 'Invalid server response' };
+                }
+                if (resp.ok && result.success) {
+                    bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+                    window.location.reload();
+                } else {
+                    alert(result.error || 'Failed to create quiz');
+                }
+            } catch (err) {
+                alert('Network error while creating quiz');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Create Quiz';
+            }
+        });
+
+        // Edit builder (matches Create UI)
+        const editForm = document.getElementById('editQuizForm');
+        const editQuestionList = document.getElementById('editQuestionList');
+        const editAddQuestionBtn = document.getElementById('editAddQuestionBtn');
+        const editQuestionsInput = document.getElementById('edit-questions-json');
+        const editSeedQuestions = <?= $editingQuestionsJson ?: '[]' ?>;
+
+        function addEditQuestionCard(seed = null) {
+            if (!editQuestionList) return;
+            const idx = editQuestionList.children.length + 1;
+            const card = document.createElement('div');
+            const seedType = seed?.type || 'multiple_choice';
+            card.className = 'border rounded p-3';
+            card.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <strong>Question ${idx}</strong>
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-question">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small">Question Text</label>
+                    <textarea class="form-control question-text" rows="2" required>${seed?.question_text ?? ''}</textarea>
+                </div>
+                <div class="row g-2 mb-2">
+                    <div class="col-md-6">
+                        <label class="form-label small">Question Type</label>
+                        <select class="form-select question-type">
+                            <option value="multiple_choice" ${seedType === 'multiple_choice' ? 'selected' : ''}>Multiple Choice</option>
+                            <option value="true_false" ${seedType === 'true_false' ? 'selected' : ''}>True / False</option>
+                            <option value="short_answer" ${seedType === 'short_answer' ? 'selected' : ''}>Short Answer</option>
+                            <option value="code_completion" ${seedType === 'code_completion' ? 'selected' : ''}>Code Completion</option>
+                            <option value="output_prediction" ${seedType === 'output_prediction' ? 'selected' : ''}>Output Prediction</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small">Points</label>
+                        <input type="number" class="form-control question-points" min="1" value="${seed?.points ?? 10}">
+                    </div>
+                </div>
+                <div class="answer-config"></div>`;
+            editQuestionList.appendChild(card);
+
+            buildAnswerFields(seedType, card);
+            if (seedType === 'multiple_choice' && Array.isArray(seed?.options)) {
+                const optionInputs = [...card.querySelectorAll('.option-input')];
+                seed.options.slice(0, 4).forEach((opt, i) => { if (optionInputs[i]) optionInputs[i].value = opt; });
+                const matchIdx = seed.options.findIndex(o => String(o) === String(seed?.correct_answer));
+                if (matchIdx >= 0) card.querySelector('.correct-option').value = String(matchIdx);
+            } else if (seedType === 'true_false') {
+                card.querySelector('.correct-bool').value = String(seed?.correct_answer ?? 'true');
+            } else {
+                const input = card.querySelector('.correct-text');
+                if (input) input.value = seed?.correct_answer ?? '';
+            }
+
+            card.querySelector('.question-type').addEventListener('change', function () {
+                buildAnswerFields(this.value, card);
+            });
+            card.querySelector('.remove-question').addEventListener('click', function () {
+                card.remove();
+                [...editQuestionList.children].forEach((item, i) => {
+                    item.querySelector('strong').textContent = `Question ${i + 1}`;
+                });
+            });
+        }
+
+        function collectQuestions(targetList) {
+            const out = [];
+            if (!targetList) return out;
+            for (const card of targetList.children) {
+                const type = card.querySelector('.question-type').value;
+                const question = {
+                    question_text: card.querySelector('.question-text').value.trim(),
+                    type: type,
+                    points: parseInt(card.querySelector('.question-points').value || '10', 10)
+                };
+                if (!question.question_text) continue;
+                if (type === 'multiple_choice') {
+                    const options = [...card.querySelectorAll('.option-input')].map(el => el.value.trim()).filter(Boolean);
+                    if (options.length < 2) continue;
+                    const correctIdx = parseInt(card.querySelector('.correct-option').value, 10);
+                    question.options = options;
+                    question.correct_answer = options[correctIdx] ?? options[0];
+                } else if (type === 'true_false') {
+                    question.options = ['true', 'false'];
+                    question.correct_answer = card.querySelector('.correct-bool').value;
+                } else {
+                    question.correct_answer = card.querySelector('.correct-text')?.value.trim() || '';
+                }
+                out.push(question);
+            }
+            return out;
+        }
+
+        if (editAddQuestionBtn) {
+            editAddQuestionBtn.addEventListener('click', () => addEditQuestionCard());
+        }
+        if (editQuestionList) {
+            if (Array.isArray(editSeedQuestions) && editSeedQuestions.length > 0) {
+                editSeedQuestions.forEach(q => addEditQuestionCard(q));
+            } else if (editForm) {
+                addEditQuestionCard();
+            }
+        }
+        if (editForm) {
+            editForm.addEventListener('submit', function (e) {
+                const questions = collectQuestions(editQuestionList);
+                if (questions.length === 0) {
+                    e.preventDefault();
+                    alert('Please add at least one valid question.');
+                    return;
+                }
+                editQuestionsInput.value = JSON.stringify(questions);
+            });
+        }
+    })();
+
+    <?php if ($editingQuiz): ?>
+    new bootstrap.Modal(document.getElementById('modalEditQuiz')).show();
+    <?php endif; ?>
+    </script>
 </body>
 </html>

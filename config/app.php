@@ -42,4 +42,16 @@ return [
         'quiz_top_3' => 10,
         'peer_help' => 5,
     ],
+
+    // Door kiosk settings (QR scanning tablet)
+    'kiosk' => [
+        // If non-empty, only these IPs can call /api/kiosk/* endpoints
+        'allowed_ips' => [
+            // e.g. '192.168.10.50',
+        ],
+
+        // Used as remote_commands.issued_by (must be a valid users.id).
+        // If left 0, the API will fall back to the first active admin user.
+        'issued_by_user_id' => 0,
+    ],
 ];

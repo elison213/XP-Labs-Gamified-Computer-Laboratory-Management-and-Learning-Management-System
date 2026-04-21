@@ -167,6 +167,51 @@ class UserService
     }
 
     /**
+     * Preview CSV import without inserting (counts + sample rows).
+     */
+    public function previewImportFromCsv(array $rows, array $columnMapping): array
+    {
+        $out = [
+            'would_import' => 0,
+            'would_duplicate' => 0,
+            'invalid' => 0,
+            'errors' => [],
+            'sample' => [],
+        ];
+
+        foreach ($rows as $index => $row) {
+            $lrn = trim($row[$columnMapping['lrn']] ?? '');
+            $firstName = trim($row[$columnMapping['first_name']] ?? '');
+            $lastName = trim($row[$columnMapping['last_name']] ?? '');
+
+            if ($lrn === '' || $firstName === '' || $lastName === '') {
+                $out['invalid']++;
+                $out['errors'][] = 'Row ' . ($index + 1) . ': Missing required fields';
+                continue;
+            }
+
+            if ($this->findByLrn($lrn)) {
+                $out['would_duplicate']++;
+            } else {
+                $out['would_import']++;
+            }
+
+            if (count($out['sample']) < 25) {
+                $out['sample'][] = [
+                    'row' => $index + 1,
+                    'lrn' => $lrn,
+                    'first_name' => $firstName,
+                    'last_name' => $lastName,
+                    'email' => trim($row[$columnMapping['email'] ?? ''] ?? ''),
+                    'would_skip' => $this->findByLrn($lrn) !== null,
+                ];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * Import users from uploaded CSV file.
      */
     public function importFromFile(string $filePath, string $role = 'student'): array

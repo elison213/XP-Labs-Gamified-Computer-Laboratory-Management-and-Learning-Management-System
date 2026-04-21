@@ -39,7 +39,7 @@ class PointService
     /**
      * Deduct points from a user.
      */
-    public function deductPoints(int $userId, int $points, string $reason, ?string $refType = null, ?int $refId = null): bool
+    public function deductPoints(int $userId, int $points, string $reason, ?string $refType = null, ?int $refId = null, ?int $awardedBy = null): bool
     {
         $balance = $this->getBalance($userId);
         if ($balance < $points) {
@@ -52,6 +52,7 @@ class PointService
             'reason' => $reason,
             'reference_type' => $refType,
             'reference_id' => $refId,
+            'awarded_by' => $awardedBy,
         ]);
 
         return true;
@@ -167,7 +168,7 @@ class PointService
 
             case 'quiz_perfect':
                 return $this->db->fetchOne(
-                    "SELECT COUNT(*) FROM quiz_attempts WHERE user_id = ? AND score_percentage = 100",
+                    "SELECT COUNT(*) FROM quiz_attempts WHERE user_id = ? AND max_score > 0 AND total_score >= max_score",
                     [$userId]
                 ) > 0;
 
@@ -182,8 +183,8 @@ class PointService
     private function getAttendanceStreak(int $userId): int
     {
         $records = $this->db->fetchAll(
-            "SELECT DISTINCT DATE(checkin_time) as day
-             FROM station_assignments
+            "SELECT DISTINCT DATE(clock_in) as day
+             FROM attendance_sessions
              WHERE user_id = ?
              ORDER BY day DESC",
             [$userId]

@@ -61,6 +61,20 @@ $recentQuizzes = $db->fetchAll(
 
 // Lab stats
 $labStats = $labService->getStats();
+
+// Pending tasks for teacher (assignments to grade, draft quizzes, active sessions)
+$pendingAssignments = $db->fetchAll(
+    "SELECT a.id, a.title, a.due_date, c.name as course_name, s.status as submission_status
+     FROM assignments a
+     JOIN courses c ON a.course_id = c.id
+     LEFT JOIN submissions s ON a.id = s.assignment_id AND s.user_id = ?
+     WHERE a.status = 'published' AND (s.status IS NULL OR s.status != 'graded')",
+    [$userId]
+);
+$draftQuizzes = $db->fetchAll(
+    "SELECT q.id, q.title, q.created_at FROM quizzes q WHERE q.status = 'draft' AND q.created_by = ?",
+    [$userId]
+);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -211,6 +225,7 @@ $labStats = $labService->getStats();
                         <div class="d-grid gap-2">
                             <a href="monitoring.php" class="btn btn-outline-primary">🖥️ Monitor Lab</a>
                             <a href="attendance_history.php" class="btn btn-outline-primary">📋 View Attendance</a>
+                            <a href="course_enrollments.php" class="btn btn-outline-primary">👥 Enroll Students</a>
                             <a href="quizzes_manage.php" class="btn btn-outline-primary">❓ Manage Quizzes</a>
                             <a href="submissions.php" class="btn btn-outline-primary">📤 Check Submissions</a>
                         </div>

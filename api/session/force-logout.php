@@ -7,10 +7,12 @@
 
 require_once __DIR__ . '/../../lib/Database.php';
 require_once __DIR__ . '/../../lib/Auth.php';
+require_once __DIR__ . '/../../lib/Csrf.php';
 require_once __DIR__ . '/../../services/PCService.php';
 require_once __DIR__ . '/../middleware/CorsMiddleware.php';
 
 use XPLabs\Lib\Auth;
+use XPLabs\Lib\Csrf;
 use XPLabs\Services\PCService;
 use XPLabs\Api\Middleware\CorsMiddleware;
 
@@ -24,6 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 Auth::requireRole(['admin', 'teacher']);
+Csrf::requireValidToken();
 
 $input = json_decode(file_get_contents('php://input'), true);
 $userId = (int) ($input['user_id'] ?? 0);

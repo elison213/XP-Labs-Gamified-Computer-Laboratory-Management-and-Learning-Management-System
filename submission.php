@@ -26,20 +26,22 @@ $aid = isset($_GET['assignment']) ? preg_replace('/[^a-zA-Z0-9_-]/', '', $_GET['
     <div class="card shadow-sm reveal">
       <div class="card-body">
         <h3 class="h6 mb-3">HTML structure lab</h3>
-        <form id="form-submission"
-              data-api-submit="POST"
-              data-api-endpoint="/assignments/<?php echo htmlspecialchars($aid); ?>/submissions"
-              onsubmit="return false;">
+<form id="form-submission"
+      method="POST"
+      action="api/submissions/submit.php"
+      enctype="multipart/form-data">
+    <!-- Include the assignment ID so the API knows which assignment this is for -->
+    <input type="hidden" name="assignment_id" value="<?= htmlspecialchars($aid) ?>">
           <div class="mb-3">
             <label class="form-label small text-secondary">Comments for teacher</label>
-            <textarea class="form-control" name="comment" rows="3" placeholder="Optional notes…"></textarea>
+            <textarea class="form-control" name="content" rows="3" placeholder="Optional notes…"></textarea>
           </div>
           <div class="mb-3">
             <label class="form-label small text-secondary">Upload</label>
-            <input type="file" class="form-control" name="file" disabled>
-            <p class="form-text small">Use <code>multipart/form-data</code> when API is ready.</p>
+            <input type="file" class="form-control" name="file">
+            <p class="form-text small">Upload your assignment file (max 5 MB).</p>
           </div>
-          <button type="button" class="btn btn-primary" disabled title="Connect API">Submit work</button>
+      <button type="submit" class="btn btn-primary">Submit work</button>
         </form>
       </div>
     </div>

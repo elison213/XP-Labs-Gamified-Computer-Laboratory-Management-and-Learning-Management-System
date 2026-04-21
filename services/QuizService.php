@@ -7,6 +7,7 @@
 namespace XPLabs\Services;
 
 use XPLabs\Lib\Database;
+require_once __DIR__ . '/PointService.php';
 
 class QuizService
 {
@@ -19,30 +20,26 @@ class QuizService
         $this->pointService = new PointService();
     }
 
-    /**
-     * Create a new quiz.
-     */
     public function createQuiz(array $data): int
     {
         return $this->db->insert('quizzes', [
             'course_id' => $data['course_id'],
             'title' => $data['title'],
             'description' => $data['description'] ?? null,
-            'quiz_code' => $data['quiz_code'] ?? strtoupper(substr(md5(uniqid()), 0, 6)),
-            'time_limit_seconds' => $data['time_limit_seconds'] ?? null,
-            'start_time' => $data['start_time'] ?? null,
-            'end_time' => $data['end_time'] ?? null,
-            'max_attempts' => $data['max_attempts'] ?? 1,
+            'time_limit_per_q' => $data['time_limit_per_q'] ?? 30,
+            'max_attempts' => isset($data['max_attempts']) ? max(1, (int) $data['max_attempts']) : 1,
+            'scheduled_at' => $data['scheduled_at'] ?? null,
+            'closes_at' => $data['closes_at'] ?? null,
             'shuffle_questions' => $data['shuffle_questions'] ?? 0,
+            'shuffle_answers' => $data['shuffle_answers'] ?? 1,
+            'show_live_leaderboard' => $data['show_live_leaderboard'] ?? 1,
+            'allow_powerups' => $data['allow_powerups'] ?? 1,
             'show_results_immediately' => $data['show_results_immediately'] ?? 1,
             'status' => 'draft',
             'created_by' => $data['created_by'],
         ]);
     }
 
-    /**
-     * Get a quiz by ID.
-     */
     public function getQuiz(int $quizId): ?array
     {
         return $this->db->fetch(
@@ -54,9 +51,6 @@ class QuizService
         );
     }
 
-    /**
-     * Get quizzes for a course.
-     */
     public function getCourseQuizzes(int $courseId): array
     {
         return $this->db->fetchAll(
@@ -69,115 +63,114 @@ class QuizService
         );
     }
 
-    /**
-     * Publish a quiz.
-     */
     public function publishQuiz(int $quizId): bool
     {
-        $quiz = $this->getQuiz($quizId);
-        if (!$quiz) {
-            return false;
-        }
-
-        // Check if quiz has questions
         $questionCount = (int) $this->db->fetchOne("SELECT COUNT(*) FROM quiz_questions WHERE quiz_id = ?", [$quizId]);
         if ($questionCount === 0) {
             throw new \Exception('Quiz must have at least one question');
         }
 
-        return $this->db->update('quizzes', ['status' => 'published'], 'id = ?', [$quizId]) > 0;
+        return $this->db->update('quizzes', ['status' => 'active'], 'id = ?', [$quizId]) > 0;
     }
 
-    /**
-     * Add a question to a quiz.
-     */
     public function addQuestion(int $quizId, array $data): int
     {
         return $this->db->insert('quiz_questions', [
             'quiz_id' => $quizId,
+            'question_number' => $data['question_number'] ?? $this->getNextQuestionNumber($quizId),
             'question_text' => $data['question_text'],
-            'question_type' => $data['question_type'] ?? 'multiple_choice',
+            'type' => $data['type'] ?? 'multiple_choice',
+            'code_snippet' => $data['code_snippet'] ?? null,
+            'code_language' => $data['code_language'] ?? null,
             'options' => isset($data['options']) ? json_encode($data['options']) : null,
             'correct_answer' => isset($data['correct_answer']) ? json_encode($data['correct_answer']) : null,
             'points' => $data['points'] ?? 10,
-            'order_num' => $data['order_num'] ?? 0,
+            'time_limit' => $data['time_limit'] ?? null,
+            'hint' => $data['hint'] ?? null,
+            'explanation' => $data['explanation'] ?? null,
         ]);
     }
 
-    /**
-     * Add questions from question bank.
-     */
     public function addQuestionsFromBank(int $quizId, array $questionIds): int
     {
         $count = 0;
-        $orderNum = (int) $this->db->fetchOne("SELECT COALESCE(MAX(order_num), 0) + 1 FROM quiz_questions WHERE quiz_id = ?", [$quizId]);
+        $questionNumber = $this->getNextQuestionNumber($quizId);
 
         foreach ($questionIds as $qId) {
             $bankQuestion = $this->db->fetch("SELECT * FROM question_bank WHERE id = ?", [$qId]);
-            if ($bankQuestion) {
-                $this->db->insert('quiz_questions', [
-                    'quiz_id' => $quizId,
-                    'question_text' => $bankQuestion['question_text'],
-                    'question_type' => $bankQuestion['type'],
-                    'code_snippet' => $bankQuestion['code_snippet'],
-                    'code_language' => $bankQuestion['code_language'],
-                    'options' => $bankQuestion['options'],
-                    'correct_answer' => $bankQuestion['correct_answer'],
-                    'explanation' => $bankQuestion['explanation'],
-                    'points' => $bankQuestion['points'],
-                    'order_num' => $orderNum++,
-                    'source_question_id' => $qId,
-                ]);
-                $count++;
+            if (!$bankQuestion) {
+                continue;
             }
+
+            $this->db->insert('quiz_questions', [
+                'quiz_id' => $quizId,
+                'question_number' => $questionNumber++,
+                'question_text' => $bankQuestion['question_text'],
+                'type' => $bankQuestion['type'],
+                'code_snippet' => $bankQuestion['code_snippet'],
+                'code_language' => $bankQuestion['code_language'],
+                'options' => $bankQuestion['options'],
+                'correct_answer' => $bankQuestion['correct_answer'],
+                'hint' => $bankQuestion['hint'],
+                'explanation' => $bankQuestion['explanation'],
+                'points' => $bankQuestion['points'],
+            ]);
+            $count++;
         }
 
         return $count;
     }
 
-    /**
-     * Get quiz questions.
-     */
     public function getQuestions(int $quizId): array
     {
         return $this->db->fetchAll(
-            "SELECT * FROM quiz_questions WHERE quiz_id = ? ORDER BY order_num ASC",
+            "SELECT * FROM quiz_questions WHERE quiz_id = ? ORDER BY question_number ASC",
             [$quizId]
         );
     }
 
-    /**
-     * Start a quiz attempt.
-     */
     public function startAttempt(int $quizId, int $userId): array
     {
         $quiz = $this->getQuiz($quizId);
         if (!$quiz) {
             return ['success' => false, 'message' => 'Quiz not found'];
         }
-
-        if ($quiz['status'] !== 'published') {
-            return ['success' => false, 'message' => 'Quiz is not published'];
+        if ($quiz['status'] !== 'active') {
+            return ['success' => false, 'message' => 'Quiz is not active'];
+        }
+        if (!empty($quiz['scheduled_at']) && strtotime($quiz['scheduled_at']) > time()) {
+            return ['success' => false, 'message' => 'Quiz has not started yet'];
+        }
+        if (!empty($quiz['closes_at']) && strtotime($quiz['closes_at']) < time()) {
+            return ['success' => false, 'message' => 'Quiz is already closed'];
         }
 
-        // Check max attempts
-        $attempts = (int) $this->db->fetchOne(
-            "SELECT COUNT(*) FROM quiz_attempts WHERE quiz_id = ? AND user_id = ?",
+        $maxAttempts = (int) ($quiz['max_attempts'] ?? 1);
+        if ($maxAttempts > 0) {
+            $finishedAttempts = (int) $this->db->fetchOne(
+                "SELECT COUNT(*) FROM quiz_attempts WHERE quiz_id = ? AND user_id = ? AND status IN ('completed', 'abandoned', 'submitted_late')",
+                [$quizId, $userId]
+            );
+            if ($finishedAttempts >= $maxAttempts) {
+                return ['success' => false, 'message' => 'Maximum quiz attempts reached'];
+            }
+        }
+
+        $inProgress = $this->db->fetch(
+            "SELECT id FROM quiz_attempts WHERE quiz_id = ? AND user_id = ? AND status = 'in_progress' ORDER BY started_at DESC LIMIT 1",
             [$quizId, $userId]
         );
-        if ($quiz['max_attempts'] > 0 && $attempts >= $quiz['max_attempts']) {
-            return ['success' => false, 'message' => 'Maximum attempts reached'];
-        }
-
-        $attemptId = $this->db->insert('quiz_attempts', [
-            'quiz_id' => $quizId,
-            'user_id' => $userId,
-            'status' => 'in_progress',
-            'started_at' => date('Y-m-d H:i:s'),
-        ]);
+        $attemptId = $inProgress
+            ? (int) $inProgress['id']
+            : $this->db->insert('quiz_attempts', [
+                'quiz_id' => $quizId,
+                'user_id' => $userId,
+                'status' => 'in_progress',
+                'started_at' => date('Y-m-d H:i:s'),
+            ]);
 
         $questions = $this->getQuestions($quizId);
-        if ($quiz['shuffle_questions']) {
+        if ((int) $quiz['shuffle_questions'] === 1) {
             shuffle($questions);
         }
 
@@ -186,14 +179,11 @@ class QuizService
             'attempt_id' => $attemptId,
             'quiz' => $quiz,
             'questions' => $questions,
-            'time_limit' => $quiz['time_limit_seconds'],
+            'time_limit' => (int) ($quiz['time_limit_per_q'] ?? 30) * max(1, count($questions)),
         ];
     }
 
-    /**
-     * Submit an answer for a question.
-     */
-    public function submitAnswer(int $attemptId, int $questionId, $answer, ?bool $usedPowerup = null): array
+    public function submitAnswer(int $attemptId, int $questionId, $answer, ?int $usedPowerup = null): array
     {
         $attempt = $this->db->fetch("SELECT * FROM quiz_attempts WHERE id = ?", [$attemptId]);
         if (!$attempt || $attempt['status'] !== 'in_progress') {
@@ -204,35 +194,48 @@ class QuizService
         if (!$question) {
             return ['success' => false, 'message' => 'Question not found'];
         }
+        if ((int) $attempt['quiz_id'] !== (int) $question['quiz_id']) {
+            return ['success' => false, 'message' => 'Question does not belong to this quiz'];
+        }
 
         $isCorrect = $this->checkAnswer($question, $answer);
-        $points = $isCorrect ? $question['points'] : 0;
+        $points = $isCorrect ? (float) $question['points'] : 0;
 
-        // Apply powerup multiplier if used
         if ($usedPowerup) {
             $powerup = $this->db->fetch("SELECT * FROM powerups WHERE id = ?", [$usedPowerup]);
-            if ($powerup && $powerup['config']) {
-                $config = json_decode($powerup['config'], true);
-                if ($config['effect'] === 'multiply_points') {
-                    $points *= $config['factor'];
+            if ($powerup && !empty($powerup['config'])) {
+                $config = json_decode($powerup['config'], true) ?? [];
+                if (($config['effect'] ?? '') === 'multiply_points') {
+                    $points *= (float) ($config['factor'] ?? 1);
                 }
             }
         }
 
-        $this->db->insert('quiz_answers', [
-            'attempt_id' => $attemptId,
-            'question_id' => $questionId,
-            'answer' => is_array($answer) ? json_encode($answer) : $answer,
+        $existing = $this->db->fetch(
+            "SELECT id FROM quiz_answers WHERE attempt_id = ? AND question_id = ?",
+            [$attemptId, $questionId]
+        );
+
+        $payload = [
+            'user_id' => (int) $attempt['user_id'],
+            'answer' => json_encode($answer),
             'is_correct' => $isCorrect ? 1 : 0,
             'points_earned' => $points,
-        ]);
+            'powerup_used' => $usedPowerup ? (string) $usedPowerup : null,
+            'answered_at' => date('Y-m-d H:i:s'),
+        ];
+
+        if ($existing) {
+            $this->db->update('quiz_answers', $payload, 'id = ?', [(int) $existing['id']]);
+        } else {
+            $payload['attempt_id'] = $attemptId;
+            $payload['question_id'] = $questionId;
+            $this->db->insert('quiz_answers', $payload);
+        }
 
         return ['success' => true, 'is_correct' => $isCorrect, 'points_earned' => $points];
     }
 
-    /**
-     * Finish a quiz attempt and calculate score.
-     */
     public function finishAttempt(int $attemptId): array
     {
         $attempt = $this->db->fetch("SELECT * FROM quiz_attempts WHERE id = ?", [$attemptId]);
@@ -241,31 +244,39 @@ class QuizService
         }
 
         $answers = $this->db->fetchAll("SELECT * FROM quiz_answers WHERE attempt_id = ?", [$attemptId]);
-        $totalPoints = array_sum(array_column($answers, 'points_earned'));
-        $correctCount = count(array_filter($answers, fn($a) => $a['is_correct']));
-        $totalQuestions = count($answers);
-        $percentage = $totalQuestions > 0 ? round(($correctCount / $totalQuestions) * 100, 2) : 0;
+        $totalPoints = (float) array_sum(array_column($answers, 'points_earned'));
+        $correctCount = count(array_filter($answers, fn($a) => (int) $a['is_correct'] === 1));
+        $totalQuestions = (int) $this->db->fetchOne(
+            "SELECT COUNT(*) FROM quiz_questions WHERE quiz_id = ?",
+            [(int) $attempt['quiz_id']]
+        );
+        $maxScore = (float) $this->db->fetchOne(
+            "SELECT COALESCE(SUM(points), 0) FROM quiz_questions WHERE quiz_id = ?",
+            [(int) $attempt['quiz_id']]
+        );
+        $percentage = $totalQuestions > 0 ? round(($correctCount / $totalQuestions) * 100, 2) : 0.0;
 
         $this->db->update('quiz_attempts', [
             'status' => 'completed',
-            'total_points' => $totalPoints,
+            'total_score' => $totalPoints,
+            'max_score' => $maxScore,
             'correct_answers' => $correctCount,
             'total_questions' => $totalQuestions,
-            'score_percentage' => $percentage,
             'finished_at' => date('Y-m-d H:i:s'),
         ], 'id = ?', [$attemptId]);
 
-        // Award quiz points
         if ($percentage >= 50) {
-            $this->pointService->awardPoints($attempt['user_id'], $totalPoints, 'quiz', 'quiz_attempt', $attemptId);
+            $this->pointService->awardPoints((int) $attempt['user_id'], (int) round($totalPoints), 'quiz', 'quiz_attempt', $attemptId);
         }
 
-        // Check for perfect score bonus
-        if ($percentage == 100) {
+        if ($percentage == 100.0) {
             $config = require __DIR__ . '/../config/app.php';
-            $bonus = $config['points']['quiz_perfect_bonus'] ?? 50;
-            $this->pointService->awardPoints($attempt['user_id'], $bonus, 'quiz_perfect_bonus', 'quiz_attempt', $attemptId);
+            $bonus = (int) ($config['points']['quiz_perfect_bonus'] ?? 50);
+            $this->pointService->awardPoints((int) $attempt['user_id'], $bonus, 'quiz_perfect_bonus', 'quiz_attempt', $attemptId);
         }
+
+        $quiz = $this->db->fetch("SELECT show_results_immediately FROM quizzes WHERE id = ?", [(int) $attempt['quiz_id']]);
+        $canViewResults = (int) ($quiz['show_results_immediately'] ?? 1) === 1;
 
         return [
             'success' => true,
@@ -273,85 +284,77 @@ class QuizService
             'percentage' => $percentage,
             'correct' => $correctCount,
             'total' => $totalQuestions,
+            'can_view_results' => $canViewResults,
         ];
     }
 
-    /**
-     * Check if an answer is correct.
-     */
     private function checkAnswer(array $question, $answer): bool
     {
-        $correctAnswer = json_decode($question['correct_answer'], true) ?? $question['correct_answer'];
+        $decoded = json_decode((string) $question['correct_answer'], true);
+        $correctAnswer = $decoded !== null ? $decoded : $question['correct_answer'];
+        $normalizedAnswer = is_string($answer) ? trim($answer) : $answer;
 
-        switch ($question['question_type']) {
+        switch ($question['type']) {
             case 'multiple_choice':
-                return $answer == $correctAnswer;
-
+                return $normalizedAnswer == $correctAnswer;
             case 'true_false':
-                return strtolower(trim($answer)) === strtolower(trim($correctAnswer));
-
             case 'short_answer':
-                return strtolower(trim($answer)) === strtolower(trim($correctAnswer));
-
+                return strtolower((string) $normalizedAnswer) === strtolower(trim((string) $correctAnswer));
             case 'code_completion':
             case 'output_prediction':
-                return trim($answer) === trim($correctAnswer);
-
+                return trim((string) $normalizedAnswer) === trim((string) $correctAnswer);
             default:
                 return false;
         }
     }
 
-    /**
-     * Get quiz results for an attempt.
-     */
     public function getResults(int $attemptId): ?array
     {
         $attempt = $this->db->fetch(
-            "SELECT qa.*, u.first_name, u.last_name
+            "SELECT qa.*, q.title, q.status as quiz_status, q.show_results_immediately, u.first_name, u.last_name
              FROM quiz_attempts qa
+             JOIN quizzes q ON qa.quiz_id = q.id
              JOIN users u ON qa.user_id = u.id
              WHERE qa.id = ?",
             [$attemptId]
         );
-
         if (!$attempt) {
             return null;
         }
 
         $answers = $this->db->fetchAll(
-            "SELECT qa.*, qq.question_text, qq.question_type, qq.options, qq.correct_answer, qq.explanation, qq.points
+            "SELECT qa.*, qq.question_text, qq.type as question_type, qq.options, qq.correct_answer, qq.explanation, qq.points
              FROM quiz_answers qa
              JOIN quiz_questions qq ON qa.question_id = qq.id
-             WHERE qa.attempt_id = ?",
+             WHERE qa.attempt_id = ?
+             ORDER BY qq.question_number ASC",
             [$attemptId]
         );
 
         return [
             'attempt' => $attempt,
             'answers' => $answers,
+            'score' => (float) $attempt['total_score'],
+            'total' => (int) $attempt['total_questions'],
+            'correct' => (int) $attempt['correct_answers'],
+            'percentage' => (float) ((float) $attempt['max_score'] > 0 ? round(((float) $attempt['total_score'] / (float) $attempt['max_score']) * 100, 2) : 0),
         ];
     }
 
-    /**
-     * Get quiz leaderboard.
-     */
     public function getLeaderboard(int $quizId, int $limit = 10): array
     {
         return $this->db->fetchAll(
-            "SELECT qa.*, u.first_name, u.last_name, u.lrn
+            "SELECT qa.*, u.first_name, u.last_name, u.lrn,
+                    CASE WHEN qa.max_score > 0 THEN ROUND((qa.total_score / qa.max_score) * 100, 2) ELSE 0 END as percentage
              FROM quiz_attempts qa
              JOIN users u ON qa.user_id = u.id
              WHERE qa.quiz_id = ? AND qa.status = 'completed'
-             ORDER BY qa.score_percentage DESC, qa.finished_at ASC
+             ORDER BY percentage DESC, qa.finished_at ASC
              LIMIT $limit",
             [$quizId]
         );
     }
 
-    /**
-     * Search question bank.
-     */
     public function searchQuestionBank(array $filters = [], int $page = 1, int $perPage = 20): array
     {
         $where = ['1=1'];
@@ -361,22 +364,18 @@ class QuizService
             $where[] = 'subject = ?';
             $params[] = $filters['subject'];
         }
-
         if (!empty($filters['topic'])) {
             $where[] = 'topic = ?';
             $params[] = $filters['topic'];
         }
-
         if (!empty($filters['type'])) {
             $where[] = 'type = ?';
             $params[] = $filters['type'];
         }
-
         if (!empty($filters['difficulty'])) {
             $where[] = 'difficulty = ?';
             $params[] = $filters['difficulty'];
         }
-
         if (!empty($filters['search'])) {
             $where[] = '(question_text LIKE ? OR code_snippet LIKE ?)';
             $search = '%' . $filters['search'] . '%';
@@ -386,7 +385,6 @@ class QuizService
 
         $whereClause = implode(' AND ', $where);
         $offset = ($page - 1) * $perPage;
-
         $total = (int) $this->db->fetchOne("SELECT COUNT(*) FROM question_bank WHERE $whereClause", $params);
         $questions = $this->db->fetchAll(
             "SELECT * FROM question_bank WHERE $whereClause ORDER BY created_at DESC LIMIT $perPage OFFSET $offset",
@@ -402,9 +400,6 @@ class QuizService
         ];
     }
 
-    /**
-     * Create a question in the bank.
-     */
     public function createQuestion(array $data, int $createdBy): int
     {
         return $this->db->insert('question_bank', [
@@ -423,5 +418,13 @@ class QuizService
             'bloom_level' => $data['bloom_level'] ?? null,
             'created_by' => $createdBy,
         ]);
+    }
+
+    private function getNextQuestionNumber(int $quizId): int
+    {
+        return (int) $this->db->fetchOne(
+            "SELECT COALESCE(MAX(question_number), 0) + 1 FROM quiz_questions WHERE quiz_id = ?",
+            [$quizId]
+        );
     }
 }

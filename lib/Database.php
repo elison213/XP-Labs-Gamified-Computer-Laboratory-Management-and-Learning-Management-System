@@ -37,12 +37,39 @@ class Database
             $this->config['charset']
         );
 
-        $this->connection = new \PDO(
-            $dsn,
-            $this->config['username'],
-            $this->config['password'],
-            $this->config['options'] ?? []
-        );
+        try {
+            $this->connection = new \PDO(
+                $dsn,
+                $this->config['username'],
+                $this->config['password'],
+                $this->config['options'] ?? []
+            );
+        } catch (\PDOException $e) {
+            // #region agent log
+            file_put_contents(
+                __DIR__ . '/../debug-10ea95.log',
+                json_encode([
+                    'sessionId' => '10ea95',
+                    'runId' => 'initial',
+                    'hypothesisId' => 'H6',
+                    'location' => 'lib/Database.php:connect',
+                    'message' => 'pdo_connect_failed',
+                    'data' => [
+                        'driver' => $this->config['driver'] ?? null,
+                        'host' => $this->config['host'] ?? null,
+                        'port' => $this->config['port'] ?? null,
+                        'database' => $this->config['database'] ?? null,
+                        'charset' => $this->config['charset'] ?? null,
+                        'exception_code' => $e->getCode(),
+                        'exception_message' => $e->getMessage(),
+                    ],
+                    'timestamp' => (int) round(microtime(true) * 1000),
+                ], JSON_UNESCAPED_SLASHES) . PHP_EOL,
+                FILE_APPEND
+            );
+            // #endregion
+            throw $e;
+        }
     }
 
     public function getConnection(): \PDO

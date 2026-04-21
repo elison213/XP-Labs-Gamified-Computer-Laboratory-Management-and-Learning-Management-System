@@ -33,19 +33,53 @@ if (!$quiz) {
 
 // Get questions
 $questions = $db->fetchAll(
-    "SELECT * FROM quiz_questions WHERE quiz_id = ? ORDER BY sort_order ASC",
+    "SELECT * FROM quiz_questions WHERE quiz_id = ? ORDER BY question_number ASC",
     [$quizId]
 );
 
 // Get attempts with student info
 $attempts = $db->fetchAll(
-    "SELECT qa.*, u.lrn, u.first_name, u.last_name
+    "SELECT qa.*, u.lrn, u.first_name, u.last_name,
+            CASE 
+                WHEN qa.max_score > 0 THEN ROUND((qa.total_score / qa.max_score) * 100, 2)
+                ELSE 0
+            END AS score_percentage
      FROM quiz_attempts qa
      JOIN users u ON qa.user_id = u.id
      WHERE qa.quiz_id = ?
-     ORDER BY qa.score_percentage DESC, qa.finished_at DESC",
+     ORDER BY score_percentage DESC, qa.finished_at DESC",
     [$quizId]
 );
+
+$questionAnalytics = $db->fetchAll(
+    "SELECT qq.id, qq.question_number, qq.question_text, qq.type,
+            COUNT(qa.id) AS total_answers,
+            SUM(CASE WHEN qa.is_correct = 1 THEN 1 ELSE 0 END) AS correct_answers,
+            SUM(CASE WHEN qa.is_correct = 0 THEN 1 ELSE 0 END) AS wrong_answers
+     FROM quiz_questions qq
+     LEFT JOIN quiz_answers qa ON qa.question_id = qq.id
+     WHERE qq.quiz_id = ?
+     GROUP BY qq.id
+     ORDER BY qq.question_number ASC",
+    [$quizId]
+);
+
+$attemptIds = array_map(fn($a) => (int) $a['id'], $attempts);
+$answersByAttempt = [];
+if (!empty($attemptIds)) {
+    $idList = implode(',', $attemptIds);
+    $answers = $db->fetchAll(
+        "SELECT qa.attempt_id, qa.answer, qa.is_correct, qa.points_earned,
+                qq.question_number, qq.question_text, qq.correct_answer
+         FROM quiz_answers qa
+         JOIN quiz_questions qq ON qa.question_id = qq.id
+         WHERE qa.attempt_id IN ($idList)
+         ORDER BY qq.question_number ASC"
+    );
+    foreach ($answers as $ans) {
+        $answersByAttempt[(int) $ans['attempt_id']][] = $ans;
+    }
+}
 
 // Calculate stats
 $totalAttempts = count($attempts);
@@ -53,6 +87,23 @@ $avgScore = $totalAttempts > 0 ? array_sum(array_column($attempts, 'score_percen
 $highScore = $totalAttempts > 0 ? max(array_column($attempts, 'score_percentage')) : 0;
 $lowScore = $totalAttempts > 0 ? min(array_column($attempts, 'score_percentage')) : 0;
 $passCount = count(array_filter($attempts, fn($a) => ($a['score_percentage'] ?? 0) >= 50));
+$completionRate = $totalAttempts > 0
+    ? round((count(array_filter($attempts, fn($a) => $a['status'] === 'completed')) / $totalAttempts) * 100, 1)
+    : 0;
+
+$distribution = [
+    '90-100' => 0,
+    '75-89' => 0,
+    '50-74' => 0,
+    '0-49' => 0,
+];
+foreach ($attempts as $a) {
+    $score = (float) ($a['score_percentage'] ?? 0);
+    if ($score >= 90) $distribution['90-100']++;
+    elseif ($score >= 75) $distribution['75-89']++;
+    elseif ($score >= 50) $distribution['50-74']++;
+    else $distribution['0-49']++;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -140,6 +191,8 @@ $passCount = count(array_filter($attempts, fn($a) => ($a['score_percentage'] ?? 
         .score-bar .fill.high { background: var(--green); }
         .score-bar .fill.medium { background: var(--yellow); }
         .score-bar .fill.low { background: var(--red); }
+        .dist-bar { height: 10px; border-radius: 6px; background: #e2e8f0; overflow: hidden; }
+        .dist-fill { height: 100%; background: var(--accent); }
     </style>
 </head>
 <body>
@@ -150,48 +203,89 @@ $passCount = count(array_filter($attempts, fn($a) => ($a['score_percentage'] ?? 
                 <h2 class="mb-1"><i class="bi bi-bar-chart me-2"></i>Quiz Results</h2>
                 <p class="text-muted mb-0"><?= e($quiz['title']) ?><?= $quiz['course_name'] ? ' - ' . $quiz['course_name'] : '' ?></p>
             </div>
-            <a href="quizzes_manage.php" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i> Back</a>
+            <div class="d-flex gap-2">
+                <a href="quizzes_manage.php?edit_quiz_id=<?= (int) $quiz['id'] ?>" class="btn btn-primary">
+                    <i class="bi bi-pencil-square me-1"></i> Edit Quiz
+                </a>
+                <a href="quizzes_manage.php" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i> Back</a>
+            </div>
         </div>
 
         <!-- Stats -->
         <div class="row g-3 mb-4">
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="stat-card">
                     <div class="value"><?= $totalAttempts ?></div>
                     <div class="label">Total Attempts</div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="stat-card">
                     <div class="value text-primary"><?= number_format($avgScore, 1) ?>%</div>
                     <div class="label">Average Score</div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="stat-card">
                     <div class="value text-success"><?= number_format($highScore, 1) ?>%</div>
                     <div class="label">Highest Score</div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
+                <div class="stat-card">
+                    <div class="value text-danger"><?= number_format($lowScore, 1) ?>%</div>
+                    <div class="label">Lowest Score</div>
+                </div>
+            </div>
+            <div class="col-md-2">
                 <div class="stat-card">
                     <div class="value text-success"><?= $passCount ?> / <?= $totalAttempts ?></div>
                     <div class="label">Passed (≥50%)</div>
                 </div>
             </div>
+            <div class="col-md-2">
+                <div class="stat-card">
+                    <div class="value text-info"><?= number_format($completionRate, 1) ?>%</div>
+                    <div class="label">Completion</div>
+                </div>
+            </div>
         </div>
 
-        <!-- Quiz Info -->
-        <div class="xp-card mb-4">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>Quiz Details</h5>
+        <div class="row g-4 mb-4">
+            <div class="col-lg-6">
+                <div class="xp-card h-100">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>Quiz Details</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-2"><strong>Time/Question:</strong> <?= (int) ($quiz['time_limit_per_q'] ?? 30) ?> sec</div>
+                            <div class="col-md-6 mb-2"><strong>Questions:</strong> <?= count($questions) ?></div>
+                            <div class="col-md-6 mb-2"><strong>Start:</strong> <?= $quiz['scheduled_at'] ? date('M j, Y H:i', strtotime($quiz['scheduled_at'])) : 'Not set' ?></div>
+                            <div class="col-md-6 mb-2"><strong>End:</strong> <?= $quiz['closes_at'] ? date('M j, Y H:i', strtotime($quiz['closes_at'])) : 'Not set' ?></div>
+                            <div class="col-md-12"><strong>Status:</strong> <span class="badge bg-<?= $quiz['status'] === 'active' ? 'success' : ($quiz['status'] === 'draft' ? 'secondary' : 'danger') ?>"><?= ucfirst($quiz['status']) ?></span></div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-3"><strong>Time Limit:</strong> <?= $quiz['time_limit_minutes'] ?> min</div>
-                    <div class="col-md-3"><strong>Questions:</strong> <?= count($questions) ?></div>
-                    <div class="col-md-3"><strong>Start:</strong> <?= $quiz['start_time'] ? date('M j, Y H:i', strtotime($quiz['start_time'])) : 'Not set' ?></div>
-                    <div class="col-md-3"><strong>Status:</strong> <span class="badge bg-<?= $quiz['status'] === 'active' ? 'success' : ($quiz['status'] === 'draft' ? 'secondary' : 'danger') ?>"><?= ucfirst($quiz['status']) ?></span></div>
+            <div class="col-lg-6">
+                <div class="xp-card h-100">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-bar-chart-line me-2"></i>Score Distribution</h5>
+                    </div>
+                    <div class="card-body">
+                        <?php foreach ($distribution as $label => $count): 
+                            $pct = $totalAttempts > 0 ? round(($count / $totalAttempts) * 100, 1) : 0;
+                        ?>
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between small mb-1">
+                                <span><?= $label ?>%</span>
+                                <span><?= $count ?> students (<?= $pct ?>%)</span>
+                            </div>
+                            <div class="dist-bar"><div class="dist-fill" style="width: <?= $pct ?>%"></div></div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
                 </div>
             </div>
         </div>
@@ -214,6 +308,7 @@ $passCount = count(array_filter($attempts, fn($a) => ($a['score_percentage'] ?? 
                                 <th>Duration</th>
                                 <th>Finished</th>
                                 <th>Status</th>
+                                <th class="text-end">Review</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -241,12 +336,88 @@ $passCount = count(array_filter($attempts, fn($a) => ($a['score_percentage'] ?? 
                                 <td><?= $durationMin ?> min</td>
                                 <td><?= $a['finished_at'] ? date('M j, H:i', strtotime($a['finished_at'])) : '-' ?></td>
                                 <td><span class="badge bg-<?= $a['status'] === 'completed' ? 'success' : 'warning' ?>"><?= ucfirst($a['status']) ?></span></td>
+                                <td class="text-end">
+                                    <button class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#attempt-<?= (int) $a['id'] ?>">
+                                        View Answers
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr class="collapse" id="attempt-<?= (int) $a['id'] ?>">
+                                <td colspan="8" class="bg-light">
+                                    <?php $attemptAnswers = $answersByAttempt[(int) $a['id']] ?? []; ?>
+                                    <?php if (empty($attemptAnswers)): ?>
+                                        <div class="text-muted">No submitted answers.</div>
+                                    <?php else: ?>
+                                        <?php foreach ($attemptAnswers as $ans): 
+                                            $studentAnsRaw = $ans['answer'];
+                                            $studentAnsJson = json_decode((string) $studentAnsRaw, true);
+                                            $studentAns = (json_last_error() === JSON_ERROR_NONE && $studentAnsJson !== null)
+                                                ? (is_array($studentAnsJson) ? implode(', ', $studentAnsJson) : (string) $studentAnsJson)
+                                                : (string) $studentAnsRaw;
+                                            $correctRaw = $ans['correct_answer'];
+                                            $correctJson = json_decode((string) $correctRaw, true);
+                                            $correctAns = (json_last_error() === JSON_ERROR_NONE && $correctJson !== null)
+                                                ? (is_array($correctJson) ? implode(', ', $correctJson) : (string) $correctJson)
+                                                : (string) $correctRaw;
+                                        ?>
+                                        <div class="border rounded p-2 mb-2 bg-white">
+                                            <div class="small fw-semibold mb-1">Q<?= (int) $ans['question_number'] ?>: <?= e($ans['question_text']) ?></div>
+                                            <div class="small"><strong>Student:</strong> <span class="<?= ((int) $ans['is_correct'] === 1) ? 'text-success' : 'text-danger' ?>"><?= e($studentAns) ?></span></div>
+                                            <div class="small"><strong>Correct:</strong> <?= e($correctAns) ?></div>
+                                        </div>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </td>
                             </tr>
                             <?php endforeach; ?>
                             <?php if (empty($attempts)): ?>
                             <tr>
-                                <td colspan="7" class="text-center text-muted py-4">No attempts yet</td>
+                                <td colspan="8" class="text-center text-muted py-4">No attempts yet</td>
                             </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Question Analytics -->
+        <div class="xp-card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-activity me-2"></i>Question Analytics (Right vs Wrong)</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="xp-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Question</th>
+                                <th>Type</th>
+                                <th>Right</th>
+                                <th>Wrong</th>
+                                <th>Accuracy</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($questionAnalytics as $qa): 
+                                $total = (int) ($qa['total_answers'] ?? 0);
+                                $right = (int) ($qa['correct_answers'] ?? 0);
+                                $wrong = (int) ($qa['wrong_answers'] ?? 0);
+                                $acc = $total > 0 ? round(($right / $total) * 100, 1) : 0;
+                                $accClass = $acc >= 75 ? 'text-success' : ($acc >= 50 ? 'text-warning' : 'text-danger');
+                            ?>
+                            <tr>
+                                <td><?= (int) $qa['question_number'] ?></td>
+                                <td><?= e(mb_strimwidth($qa['question_text'], 0, 80, '...')) ?></td>
+                                <td><?= e($qa['type']) ?></td>
+                                <td><span class="badge bg-success"><?= $right ?></span></td>
+                                <td><span class="badge bg-danger"><?= $wrong ?></span></td>
+                                <td><strong class="<?= $accClass ?>"><?= number_format($acc, 1) ?>%</strong></td>
+                            </tr>
+                            <?php endforeach; ?>
+                            <?php if (empty($questionAnalytics)): ?>
+                            <tr><td colspan="6" class="text-center text-muted py-4">No question analytics yet</td></tr>
                             <?php endif; ?>
                         </tbody>
                     </table>

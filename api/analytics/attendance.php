@@ -15,19 +15,41 @@ Auth::requireRole(['admin', 'teacher']);
 
 $db = Database::getInstance();
 $userId = Auth::id();
+$role = Auth::role();
 $courseId = (int) ($_GET['course_id'] ?? 0);
 
-// Build where clause
+// Scope attendance by course enrollment when course filter is used.
 $where = "1=1";
 $params = [];
+$enrollmentScope = "";
 
 if ($courseId) {
-    $where .= " AND sa.course_id = ?";
+    if ($role === 'teacher') {
+        $owned = (int) $db->fetchOne("SELECT COUNT(*) FROM courses WHERE id = ? AND teacher_id = ?", [$courseId, $userId]);
+        if ($owned === 0) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Invalid course access']);
+            exit;
+        }
+    }
+    $enrollmentScope = " AND EXISTS (
+        SELECT 1
+        FROM course_enrollments ce
+        WHERE ce.user_id = a.user_id
+          AND ce.course_id = ?
+          AND ce.status = 'enrolled'
+    )";
     $params[] = $courseId;
 } else {
-    $role = $_SESSION['user_role'];
     if ($role === 'teacher') {
-        $where .= " AND sa.course_id IN (SELECT id FROM courses WHERE teacher_id = ?)";
+        $enrollmentScope = " AND EXISTS (
+            SELECT 1
+            FROM course_enrollments ce
+            JOIN courses c ON c.id = ce.course_id
+            WHERE ce.user_id = a.user_id
+              AND ce.status = 'enrolled'
+              AND c.teacher_id = ?
+        )";
         $params[] = $userId;
     }
 }
@@ -35,10 +57,10 @@ if ($courseId) {
 // Attendance rate per student
 $students = $db->fetchAll(
     "SELECT u.id, CONCAT(u.first_name, ' ', u.last_name) as name,
-            COUNT(DISTINCT sa.id) as total_sessions,
-            COUNT(DISTINCT CASE WHEN sa.status = 'completed' THEN sa.id END) as attended
+            COUNT(DISTINCT a.id) as total_sessions,
+            COUNT(DISTINCT CASE WHEN a.status = 'completed' THEN a.id END) as attended
      FROM users u
-     LEFT JOIN station_assignments sa ON u.id = sa.user_id AND $where
+     LEFT JOIN attendance_sessions a ON u.id = a.user_id AND $where $enrollmentScope
      WHERE u.role = 'student' AND u.is_active = 1
      GROUP BY u.id
      HAVING total_sessions > 0
@@ -54,21 +76,22 @@ $students = array_map(function($s) {
 
 // Daily attendance trend (last 14 days)
 $trend = $db->fetchAll(
-    "SELECT DATE(clock_in) as date, COUNT(DISTINCT user_id) as count
-     FROM attendance_sessions
-     WHERE clock_in >= DATE_SUB(CURDATE(), INTERVAL 14 DAY)
-     GROUP BY DATE(clock_in)
+    "SELECT DATE(a.clock_in) as date, COUNT(DISTINCT a.user_id) as count
+     FROM attendance_sessions a
+     WHERE a.clock_in >= DATE_SUB(CURDATE(), INTERVAL 14 DAY)
+       $enrollmentScope
+     GROUP BY DATE(a.clock_in)
      ORDER BY date ASC",
-    []
+    $params
 );
 
 // Overall rate
 $rateData = $db->fetchOne(
     "SELECT 
-        COUNT(DISTINCT sa.id) as total,
-        COUNT(DISTINCT CASE WHEN sa.status = 'completed' THEN sa.id END) as attended
-     FROM station_assignments sa
-     WHERE $where",
+        COUNT(DISTINCT a.id) as total,
+        COUNT(DISTINCT CASE WHEN a.status = 'completed' THEN a.id END) as attended
+     FROM attendance_sessions a
+     WHERE $where $enrollmentScope",
     $params
 );
 

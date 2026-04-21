@@ -198,7 +198,14 @@ $userAchievements = $db->fetchAll(
     </style>
 </head>
 <body>
-    <?php include __DIR__ . '/components/student_sidebar.php'; ?>
+    <?php
+    // Include the appropriate sidebar based on the user's role.
+    if ($role === 'student') {
+        include __DIR__ . '/components/student_sidebar.php';
+    } else {
+        include __DIR__ . '/components/admin_sidebar.php';
+    }
+    ?>
 <div class="main-content">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>

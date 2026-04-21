@@ -12,7 +12,7 @@ Auth::requireRole('student');
 $userId = Auth::id();
 $db = Database::getInstance();
 
-// Get quizzes for courses the student is enrolled in (active/scheduled)
+// Get quizzes for courses the student is enrolled in (including finished ones for review)
 $availableQuizzes = $db->fetchAll(
     "SELECT q.*, c.name as course_name, c.code as course_code,
             u.first_name as teacher_first, u.last_name as teacher_last,
@@ -20,6 +20,7 @@ $availableQuizzes = $db->fetchAll(
             COALESCE(latest.best_score, 0) as best_score,
             latest.attempt_count,
             CASE 
+                WHEN q.status IN ('completed', 'archived') THEN 'finished'
                 WHEN q.scheduled_at > NOW() THEN 'upcoming'
                 WHEN q.closes_at < NOW() THEN 'closed'
                 ELSE 'available'
@@ -31,7 +32,9 @@ $availableQuizzes = $db->fetchAll(
      LEFT JOIN (
          SELECT qa.quiz_id, qa.user_id,
                 ROUND(AVG(CASE WHEN qa.total_score > 0 AND qa.max_score > 0 THEN (qa.total_score / qa.max_score) * 100 ELSE 0 END), 1) as best_score,
-                COUNT(*) as attempt_count
+                COUNT(*) as attempt_count,
+                MAX(qa.id) as latest_attempt_id,
+                MAX(CASE WHEN qa.status <> 'in_progress' OR qa.finished_at IS NOT NULL THEN qa.id ELSE NULL END) as latest_reviewable_attempt_id
          FROM quiz_attempts qa
          WHERE qa.user_id = ?
          GROUP BY qa.quiz_id, qa.user_id
@@ -39,7 +42,7 @@ $availableQuizzes = $db->fetchAll(
      LEFT JOIN (
          SELECT quiz_id, COUNT(*) as question_count FROM quiz_questions GROUP BY quiz_id
      ) qq ON q.id = qq.quiz_id
-     WHERE ce.user_id = ? AND q.status IN ('active', 'scheduled')
+     WHERE ce.user_id = ? AND q.status IN ('active', 'scheduled', 'completed', 'archived')
          ORDER BY 
          CASE 
              WHEN q.closes_at < NOW() THEN 3
@@ -156,6 +159,7 @@ $avgScore = $scoredCount > 0 ? round($totalScored / $scoredCount, 1) : 0;
         .status-badge.upcoming { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
         .status-badge.closed { background: rgba(100, 116, 139, 0.2); color: var(--text-muted); }
         .status-badge.maxed { background: rgba(34, 197, 94, 0.2); color: var(--green); }
+        .status-badge.finished { background: rgba(168, 85, 247, 0.2); color: #a855f7; }
 
         .course-label { font-size: 0.75rem; color: var(--text-muted); }
         .quiz-meta { font-size: 0.85rem; color: var(--text-muted); }
@@ -215,6 +219,14 @@ $avgScore = $scoredCount > 0 ? round($totalScored / $scoredCount, 1) : 0;
         <?php foreach ($availableQuizzes as $q): 
             $closesText = $q['closes_at'] ? date('M j, g:i A', strtotime($q['closes_at'])) : 'No deadline';
             $scheduledText = $q['scheduled_at'] ? date('M j, g:i A', strtotime($q['scheduled_at'])) : '';
+            $attemptCount = (int) ($q['attempt_count'] ?? 0);
+            $maxAttempts = max(1, (int) ($q['max_attempts'] ?? 1));
+            $hasAttemptsLeft = $attemptCount < $maxAttempts;
+            $reviewAttemptId = (int) ($q['latest_reviewable_attempt_id'] ?? 0);
+            if ($reviewAttemptId <= 0) {
+                $reviewAttemptId = (int) ($q['latest_attempt_id'] ?? 0);
+            }
+            $displayStatus = ($q['status'] === 'available' && !$hasAttemptsLeft) ? 'maxed' : $q['status'];
         ?>
         <div class="quiz-card">
             <div class="d-flex justify-content-between align-items-start mb-2">
@@ -225,18 +237,27 @@ $avgScore = $scoredCount > 0 ? round($totalScored / $scoredCount, 1) : 0;
                         <span class="text-muted">· By <?= e($q['teacher_first'] . ' ' . substr($q['teacher_last'], 0, 1) . '.') ?></span>
                     </div>
                 </div>
-                <span class="status-badge <?= $q['status'] ?>"><?= ucfirst($q['status']) ?></span>
+                <span class="status-badge <?= $displayStatus ?>"><?= $displayStatus === 'maxed' ? 'Attempt Limit Reached' : ucfirst($q['status']) ?></span>
             </div>
             
             <?php if ($q['description']): ?>
             <p class="text-muted small mb-2"><?= nl2br(e($q['description'])) ?></p>
+            <?php endif; ?>
+
+            <?php if ($reviewAttemptId > 0): ?>
+            <div class="mb-2">
+                <a href="quiz_review.php?attempt_id=<?= $reviewAttemptId ?>" class="btn btn-sm btn-outline-success">
+                    <i class="bi bi-journal-check me-1"></i>Review Right/Wrong
+                </a>
+            </div>
             <?php endif; ?>
             
             <div class="quiz-meta d-flex flex-wrap gap-3 mb-2">
                 <span><i class="bi bi-clock me-1"></i><?= $q['time_limit_per_q'] ?? 30 ?>s per question</span>
                 <span><i class="bi bi-list-ul me-1"></i><?= $q['question_count'] ?? 0 ?> questions</span>
                 <span><i class="bi bi-lightning me-1"></i>Powerups: <?= $q['allow_powerups'] ? 'Allowed' : 'Disabled' ?></span>
-                <span><i class="bi bi-bar-chart me-1"></i>Taken: <?= $q['attempt_count'] ?? 0 ?> time(s)</span>
+                <span><i class="bi bi-bar-chart me-1"></i>Taken: <?= $attemptCount ?> time(s)</span>
+                <span><i class="bi bi-arrow-repeat me-1"></i>Max Attempts: <?= $maxAttempts ?></span>
             </div>
             
             <div class="d-flex justify-content-between align-items-center mt-3">
@@ -247,19 +268,23 @@ $avgScore = $scoredCount > 0 ? round($totalScored / $scoredCount, 1) : 0;
                     <?php endif; ?>
                 </div>
                 
-                <div class="d-flex gap-2 align-items-center">
-                    <?php if ($q['best_score'] > 0): ?>
-                    <span class="score-display"><i class="bi bi-trophy me-1"></i>Best: <?= number_format($q['best_score'], 1) ?>%</span>
-                    <?php endif; ?>
-                    
-                    <?php if ($q['status'] === 'available'): ?>
-                    <span class="btn btn-sm btn-outline-secondary disabled">Coming soon</span>
-                    <?php elseif ($q['status'] === 'upcoming'): ?>
-                    <span class="btn btn-sm btn-outline-secondary disabled">Not yet open</span>
-                    <?php elseif ($q['status'] === 'closed'): ?>
-                    <span class="btn btn-sm btn-outline-secondary disabled">Closed</span>
-                    <?php endif; ?>
-                </div>
+                    <div class="d-flex gap-2 align-items-center">
+                        <?php if ($q['best_score'] > 0): ?>
+                        <span class="score-display"><i class="bi bi-trophy me-1"></i>Best: <?= number_format($q['best_score'], 1) ?>%</span>
+                        <?php endif; ?>
+
+                        <?php if ($q['status'] === 'available' && $hasAttemptsLeft): ?>
+                        <a href="quiz_attempt.php?quiz_id=<?= $q['id'] ?>" class="btn btn-sm btn-primary">Start Quiz</a>
+                        <?php elseif ($q['status'] === 'available' && !$hasAttemptsLeft): ?>
+                        <span class="btn btn-sm btn-outline-secondary disabled">Attempt limit reached</span>
+                        <?php elseif ($q['status'] === 'upcoming'): ?>
+                        <span class="btn btn-sm btn-outline-secondary disabled">Not yet open</span>
+                        <?php elseif ($q['status'] === 'closed'): ?>
+                        <span class="btn btn-sm btn-outline-secondary disabled">Closed</span>
+                        <?php elseif ($q['status'] === 'finished'): ?>
+                        <span class="btn btn-sm btn-outline-secondary disabled">Finished</span>
+                        <?php endif; ?>
+                    </div>
             </div>
         </div>
         <?php endforeach; ?>

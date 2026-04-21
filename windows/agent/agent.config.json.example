@@ -1,0 +1,11 @@
+{
+  "server_base_url": "http://127.0.0.1/xplabs",
+  "floor_id": null,
+  "station_id": null,
+  "heartbeat_interval_seconds": 30,
+  "command_poll_interval_seconds": 5,
+  "validate_interval_seconds": 10,
+  "validate_grace_minutes": 5,
+  "log_level": "info"
+}
+
