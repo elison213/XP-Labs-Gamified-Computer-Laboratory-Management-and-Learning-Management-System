@@ -15,7 +15,8 @@ function Assert-Admin {
 
 function Read-JsonFile([string]$Path) {
   if (-not (Test-Path $Path)) { throw "Config file not found: $Path" }
-  return (Get-Content -Raw -Path $Path | ConvertFrom-Json -Depth 20)
+  # ConvertFrom-Json -Depth is not available in all Windows PowerShell builds.
+  return (Get-Content -Raw -Path $Path | ConvertFrom-Json)
 }
 
 function Prompt-IfEmpty([string]$Value, [string]$Prompt, [switch]$Secret) {
@@ -29,6 +30,9 @@ function Prompt-IfEmpty([string]$Value, [string]$Prompt, [switch]$Secret) {
 }
 
 function Ensure-Feature([string]$Name) {
+  if (-not (Get-Command Get-WindowsFeature -ErrorAction SilentlyContinue)) {
+    throw "Get-WindowsFeature is unavailable. Run this script in Windows PowerShell 5.1 on Windows Server."
+  }
   $f = Get-WindowsFeature -Name $Name
   if (-not $f) { throw "WindowsFeature not found: $Name" }
   if (-not $f.Installed) {
@@ -54,9 +58,10 @@ function Set-StaticIp($cfgNet) {
     Write-Host "Warning: adapter '$alias' is not Up (status=$($adapter.Status))." -ForegroundColor Yellow
   }
 
-  # Remove existing IPv4 addresses (best effort, avoids duplicate routes)
+  # Remove existing IPv4 addresses (best effort, avoids duplicate routes).
+  # Skip APIPA and loopback addresses to prevent accidental lockout.
   Get-NetIPAddress -InterfaceAlias $alias -AddressFamily IPv4 -ErrorAction SilentlyContinue |
-    Where-Object { $_.IPAddress -ne $ip } |
+    Where-Object { $_.IPAddress -ne $ip -and $_.IPAddress -notlike '169.254.*' -and $_.IPAddress -ne '127.0.0.1' } |
     ForEach-Object { try { Remove-NetIPAddress -InterfaceAlias $alias -IPAddress $_.IPAddress -Confirm:$false -ErrorAction SilentlyContinue } catch {} }
 
   # Set address if missing
@@ -92,6 +97,24 @@ function Is-DomainController {
   } catch {
     return $false
   }
+}
+
+function Assert-WindowsServer {
+  $os = Get-CimInstance Win32_OperatingSystem
+  if (-not $os.Caption -or $os.Caption -notmatch 'Windows Server') {
+    throw "This script is intended for Windows Server only. Detected: $($os.Caption)"
+  }
+}
+
+function Ensure-WindowsPowerShell51 {
+  if ($PSVersionTable.PSVersion.Major -ge 7) {
+    throw "Run this script with Windows PowerShell 5.1 (powershell.exe), not PowerShell 7 (pwsh)."
+  }
+}
+
+function Resolve-AbsolutePathOrEmpty([string]$Path) {
+  if (-not $Path) { return "" }
+  try { return (Resolve-Path -Path $Path).Path } catch { return $Path }
 }
 
 function Ensure-DnsZoneAndRecord($cfgDns) {
@@ -143,9 +166,12 @@ function Ensure-XamppServices($cfgXampp) {
 }
 
 Assert-Admin
+Assert-WindowsServer
+Ensure-WindowsPowerShell51
 
 $resumeTask = 'XPLabs-LocalLabServer-Resume'
 $scriptSelf = $MyInvocation.MyCommand.Path
+$ConfigPath = Resolve-AbsolutePathOrEmpty -Path $ConfigPath
 
 # Load config (file or interactive)
 $cfg = $null

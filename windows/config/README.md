@@ -17,7 +17,8 @@ This folder configures a **local-only** Windows Server instance to host XPLabs o
 
 ## Requirements
 - Windows Server 2019/2022
-- Run PowerShell **as Administrator**
+- Windows Server 2025 is supported
+- Run **Windows PowerShell 5.1** (`powershell.exe`) as Administrator
 - Server NIC must be connected to your LAN (VMware Bridged recommended)
 - You must have (or install) XAMPP on the server (script can validate; install itself is optional)
 
