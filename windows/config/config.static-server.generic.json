@@ -1,0 +1,30 @@
+{
+  "domain": {
+    "fqdn": "xplabs.com",
+    "netbios": "XPLABS",
+    "safeModeAdminPassword": "CHANGE_ME"
+  },
+  "dns": {
+    "zone": "xplabs.com",
+    "host": "lab",
+    "aRecordIp": "CHANGE_ME_SERVER_STATIC_IP"
+  },
+  "network": {
+    "interfaceAlias": "Ethernet",
+    "ipAddress": "CHANGE_ME_SERVER_STATIC_IP",
+    "prefixLength": 24,
+    "defaultGateway": "CHANGE_ME_GATEWAY_IP",
+    "dnsServers": ["CHANGE_ME_SERVER_STATIC_IP"]
+  },
+  "firewall": {
+    "openDns": true,
+    "openHttp": true,
+    "openHttps": true
+  },
+  "xampp": {
+    "path": "C:\\\\xampp",
+    "apacheServiceName": "Apache2.4",
+    "mysqlServiceName": "mysql"
+  }
+}
+
