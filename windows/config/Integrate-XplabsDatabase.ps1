@@ -1,4 +1,5 @@
 param(
+  [string] $ConfigPath = "",
   [string] $ProjectPath = "C:\xampp\htdocs\xplabs",
   [string] $XamppPath = "C:\xampp",
   [string] $DatabaseName = "xplabs",
@@ -11,6 +12,11 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+function Read-JsonFile([string]$Path) {
+  if (-not (Test-Path $Path)) { throw "Config file not found: $Path" }
+  return (Get-Content -Raw -Path $Path | ConvertFrom-Json)
+}
 
 function Assert-Admin {
   $id = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -52,6 +58,18 @@ function Build-MySqlArgs([string]$User, [string]$Pass) {
 }
 
 Assert-Admin
+
+if ($ConfigPath -and $ConfigPath.Trim().Length -gt 0) {
+  $cfg = Read-JsonFile -Path $ConfigPath
+  if ($cfg.projectPath) { $ProjectPath = [string]$cfg.projectPath }
+  if ($cfg.xamppPath) { $XamppPath = [string]$cfg.xamppPath }
+  if ($cfg.databaseName) { $DatabaseName = [string]$cfg.databaseName }
+  if ($cfg.dbUser) { $DbUser = [string]$cfg.dbUser }
+  if ($null -ne $cfg.dbPassword) { $DbPassword = [string]$cfg.dbPassword }
+  if ($cfg.dumpPath) { $DumpPath = [string]$cfg.dumpPath }
+  if ($null -ne $cfg.skipMigrations) { $SkipMigrations = [bool]$cfg.skipMigrations }
+  if ($null -ne $cfg.skipSeed) { $SkipSeed = [bool]$cfg.skipSeed }
+}
 
 $mysqlExe = Get-MysqlExe -XamppRoot $XamppPath
 $phpExe = Get-PhpExe -XamppRoot $XamppPath

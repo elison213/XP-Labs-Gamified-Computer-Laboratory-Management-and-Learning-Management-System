@@ -1,0 +1,11 @@
+{
+  "projectPath": "C:\\xampp\\htdocs\\xplabs",
+  "xamppPath": "C:\\xampp",
+  "databaseName": "xplabs",
+  "dbUser": "root",
+  "dbPassword": "",
+  "dumpPath": "C:\\xampp\\htdocs\\xplabs\\windows\\config\\db\\xplabs_dump.sql",
+  "skipMigrations": false,
+  "skipSeed": false
+}
+

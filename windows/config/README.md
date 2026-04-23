@@ -58,6 +58,14 @@ Run:
 .\Integrate-XplabsDatabase.ps1 -ProjectPath "C:\xampp\htdocs\xplabs" -XamppPath "C:\xampp" -DatabaseName "xplabs" -DbUser "root"
 ```
 
+Config-file mode:
+
+```powershell
+Copy-Item .\db.config.example.json .\db.config.json
+notepad .\db.config.json
+.\Integrate-XplabsDatabase.ps1 -ConfigPath .\db.config.json
+```
+
 Behavior:
 - If dump exists: imports `xplabs_dump.sql`.
 - If no dump: runs `database\migrate.php` (if available), then applies `db/xplabs.post-import.seed.sql`.
