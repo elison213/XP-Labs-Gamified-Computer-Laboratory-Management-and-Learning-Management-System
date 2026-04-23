@@ -55,19 +55,19 @@ if (!$userId) {
     exit;
 }
 
-// End all active sessions for this user
-$sessionsEnded = $pcService->endUserSessions($userId, 'forced_logout');
-
-// Queue lock command for the PC they were using
+// Get active session before ending it so we can still identify target PC.
 $db = \XPLabs\Lib\Database::getInstance();
-$lastSession = $db->fetch(
+$activeSession = $db->fetch(
     "SELECT pc_id FROM pc_sessions WHERE user_id = ? AND status = 'active' ORDER BY checkin_time DESC LIMIT 1",
     [$userId]
 );
 
-if ($lastSession) {
+// End all active sessions for this user.
+$sessionsEnded = $pcService->endUserSessions($userId, 'forced_logout');
+
+if ($activeSession) {
     $teacherId = Auth::id() ?? 0;
-    $pcService->queueCommand($lastSession['pc_id'], $teacherId, 'lock');
+    $pcService->queueCommand((int) $activeSession['pc_id'], $teacherId, 'lock');
 }
 
 echo json_encode([

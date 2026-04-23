@@ -56,7 +56,7 @@ $quizzes = $db->fetchAll(
 );
 
 // Score distribution
-$dist = $db->fetchOne(
+$dist = $db->fetch(
     "SELECT 
         SUM(CASE WHEN (CASE WHEN qa.max_score > 0 THEN (qa.total_score / qa.max_score) * 100 ELSE 0 END) >= 90 THEN 1 ELSE 0 END) as excellent,
         SUM(CASE WHEN (CASE WHEN qa.max_score > 0 THEN (qa.total_score / qa.max_score) * 100 ELSE 0 END) >= 75 AND (CASE WHEN qa.max_score > 0 THEN (qa.total_score / qa.max_score) * 100 ELSE 0 END) < 90 THEN 1 ELSE 0 END) as good,
@@ -69,7 +69,7 @@ $dist = $db->fetchOne(
 );
 
 // Overall average
-$avgScore = $db->fetchOne(
+$avgScore = $db->fetch(
     "SELECT COALESCE(AVG(CASE WHEN qa.max_score > 0 THEN (qa.total_score / qa.max_score) * 100 ELSE 0 END), 0) as avg
      FROM quiz_attempts qa
      JOIN quizzes q ON qa.quiz_id = q.id

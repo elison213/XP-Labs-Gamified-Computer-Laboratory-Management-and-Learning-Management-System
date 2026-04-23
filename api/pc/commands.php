@@ -59,6 +59,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         echo json_encode(['error' => 'command_id is required']);
         exit;
     }
+    if (!in_array($status, ['executed', 'failed'], true)) {
+        http_response_code(400);
+        echo json_encode(['error' => "status must be 'executed' or 'failed'"]);
+        exit;
+    }
+    if ($result !== null && !is_string($result)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'result must be a string when provided']);
+        exit;
+    }
 
     // Verify the command belongs to this PC
     $db = \XPLabs\Lib\Database::getInstance();

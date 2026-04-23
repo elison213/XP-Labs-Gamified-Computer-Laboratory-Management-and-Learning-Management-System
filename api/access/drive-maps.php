@@ -6,11 +6,15 @@
  */
 
 require_once __DIR__ . '/../../lib/Database.php';
+require_once __DIR__ . '/../../lib/Auth.php';
 require_once __DIR__ . '/../../services/PCService.php';
 require_once __DIR__ . '/../middleware/CorsMiddleware.php';
+require_once __DIR__ . '/../middleware/MachineAuth.php';
 
+use XPLabs\Lib\Auth;
 use XPLabs\Services\PCService;
 use XPLabs\Api\Middleware\CorsMiddleware;
+use XPLabs\Api\Middleware\MachineAuth;
 
 header('Content-Type: application/json');
 CorsMiddleware::allowLabPCs();
@@ -24,6 +28,26 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 $role = trim($_GET['role'] ?? 'student');
 $username = trim($_GET['username'] ?? '');
 $labName = trim($_GET['lab_name'] ?? '');
+
+$pc = MachineAuth::optional();
+$isSessionUser = Auth::check();
+
+if (!$pc && !$isSessionUser) {
+    http_response_code(401);
+    echo json_encode(['error' => 'Authentication required']);
+    exit;
+}
+
+if ($isSessionUser) {
+    Auth::requireRole(['admin', 'teacher']);
+}
+
+$allowedRoles = ['student', 'teacher', 'admin'];
+if (!in_array($role, $allowedRoles, true)) {
+    http_response_code(400);
+    echo json_encode(['error' => 'Invalid role']);
+    exit;
+}
 
 $pcService = new PCService();
 $mappings = $pcService->getDriveMappings($role);

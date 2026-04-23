@@ -73,6 +73,16 @@ if ($pc['status'] === 'maintenance' || $pc['status'] === 'locked') {
     exit;
 }
 
+$pcStationId = isset($pc['station_id']) ? (int) $pc['station_id'] : 0;
+if ($stationId && $pcStationId && $stationId !== $pcStationId) {
+    http_response_code(403);
+    echo json_encode(['error' => 'station_id does not match authenticated PC']);
+    exit;
+}
+if (!$stationId && $pcStationId) {
+    $stationId = $pcStationId;
+}
+
 // Validate check-in
 $validation = $pcService->validateCheckIn($user['id'], $pc['id']);
 

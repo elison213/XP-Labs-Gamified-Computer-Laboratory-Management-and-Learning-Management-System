@@ -86,7 +86,7 @@ $trend = $db->fetchAll(
 );
 
 // Overall rate
-$rateData = $db->fetchOne(
+$rateData = $db->fetch(
     "SELECT 
         COUNT(DISTINCT a.id) as total,
         COUNT(DISTINCT CASE WHEN a.status = 'completed' THEN a.id END) as attended
@@ -95,7 +95,9 @@ $rateData = $db->fetchOne(
     $params
 );
 
-$rate = $rateData['total'] > 0 ? round(($rateData['attended'] / $rateData['total']) * 100, 1) : 0;
+$totalSessions = (int) ($rateData['total'] ?? 0);
+$attendedSessions = (int) ($rateData['attended'] ?? 0);
+$rate = $totalSessions > 0 ? round(($attendedSessions / $totalSessions) * 100, 1) : 0;
 
 echo json_encode([
     'success' => true,

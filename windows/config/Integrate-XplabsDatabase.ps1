@@ -1,6 +1,6 @@
 param(
   [string] $ConfigPath = "",
-  [string] $ProjectPath = "C:\xampp\htdocs\xplabs",
+  [string] $ProjectPath = "",
   [string] $XamppPath = "C:\xampp",
   [string] $DatabaseName = "xplabs",
   [string] $DbUser = "root",
@@ -42,6 +42,12 @@ function Get-MysqlExe([string]$XamppRoot) {
   return $mysql
 }
 
+function Invoke-MySqlFile([string]$MysqlExe, [string[]]$AuthArgs, [string]$Database, [string]$SqlPath) {
+  if (-not (Test-Path $SqlPath)) { throw "SQL file not found: $SqlPath" }
+  $normalized = ($SqlPath -replace '\\', '/')
+  & $MysqlExe @AuthArgs $Database -e "SOURCE $normalized;"
+}
+
 function Get-PhpExe([string]$XamppRoot) {
   $php = Join-Path $XamppRoot "php\php.exe"
   if (Test-Path $php) { return $php }
@@ -57,7 +63,18 @@ function Build-MySqlArgs([string]$User, [string]$Pass) {
   return @("-u", $User, "-p$Pass")
 }
 
+function Assert-Preflight([string]$ProjectRoot, [string]$MysqlExePath) {
+  if (-not (Test-Path $ProjectRoot)) { throw "Project path not found: $ProjectRoot" }
+  if (-not (Test-Path $MysqlExePath)) { throw "mysql client not found: $MysqlExePath" }
+}
+
 Assert-Admin
+
+$scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
+if (-not $ProjectPath -or $ProjectPath.Trim().Length -eq 0) {
+  # Script is in windows/config; project root is two levels up.
+  $ProjectPath = Split-Path -Parent (Split-Path -Parent $scriptRoot)
+}
 
 if ($ConfigPath -and $ConfigPath.Trim().Length -gt 0) {
   $cfg = Read-JsonFile -Path $ConfigPath
@@ -76,7 +93,13 @@ $phpExe = Get-PhpExe -XamppRoot $XamppPath
 $migratePhp = Join-Path $ProjectPath "database\migrate.php"
 $seedSql = Join-Path $ProjectPath "windows\config\db\xplabs.post-import.seed.sql"
 if (-not $DumpPath) {
-  $DumpPath = Join-Path $ProjectPath "windows\config\db\xplabs_dump.sql"
+  # Prefer dump beside this script's db folder first.
+  $localDump = Join-Path $scriptRoot "db\xplabs_dump.sql"
+  if (Test-Path $localDump) {
+    $DumpPath = $localDump
+  } else {
+    $DumpPath = Join-Path $ProjectPath "windows\config\db\xplabs_dump.sql"
+  }
 }
 
 Write-Host "== XPLabs DB integration ==" -ForegroundColor Cyan
@@ -94,12 +117,14 @@ Ensure-ServiceRunning -ServiceName "mariadb"
 
 $mysqlAuth = Build-MySqlArgs -User $DbUser -Pass $DbPassword
 
+Assert-Preflight -ProjectRoot $ProjectPath -MysqlExePath $mysqlExe
+
 Write-Host "Ensuring database exists..." -ForegroundColor Cyan
-& $mysqlExe @mysqlAuth -e "CREATE DATABASE IF NOT EXISTS \`$DatabaseName\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+& $mysqlExe @mysqlAuth -e "CREATE DATABASE IF NOT EXISTS `${DatabaseName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 
 if (Test-Path $DumpPath) {
   Write-Host "Importing dump file..." -ForegroundColor Cyan
-  cmd /c "`"$mysqlExe`" $($mysqlAuth -join ' ') $DatabaseName < `"$DumpPath`""
+  Invoke-MySqlFile -MysqlExe $mysqlExe -AuthArgs $mysqlAuth -Database $DatabaseName -SqlPath $DumpPath
   Write-Host "Dump import completed." -ForegroundColor Green
 } else {
   if (-not $SkipMigrations) {
@@ -114,12 +139,12 @@ if (Test-Path $DumpPath) {
 
 if (-not $SkipSeed -and (Test-Path $seedSql)) {
   Write-Host "Applying seed package..." -ForegroundColor Cyan
-  cmd /c "`"$mysqlExe`" $($mysqlAuth -join ' ') $DatabaseName < `"$seedSql`""
+  Invoke-MySqlFile -MysqlExe $mysqlExe -AuthArgs $mysqlAuth -Database $DatabaseName -SqlPath $seedSql
 }
 
 Write-Host "Verifying key tables..." -ForegroundColor Cyan
-& $mysqlExe @mysqlAuth -e "USE \`$DatabaseName\`; SHOW TABLES;"
-& $mysqlExe @mysqlAuth -e "USE \`$DatabaseName\`; SELECT id,lrn,role,is_active FROM users LIMIT 10;"
+& $mysqlExe @mysqlAuth -e "USE `${DatabaseName}`; SHOW TABLES;"
+& $mysqlExe @mysqlAuth -e "USE `${DatabaseName}`; SELECT id,lrn,role,is_active FROM users LIMIT 10;"
 
 Write-Host "Done. Database integration complete." -ForegroundColor Green
 

@@ -824,7 +824,7 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
         btn.disabled = true;
         
         try {
-            const response = await fetch('api/lab/stations.php');
+            const response = await fetch('/api/lab/stations');
             const data = await response.json();
             if (data.stations) {
                 // Update stats

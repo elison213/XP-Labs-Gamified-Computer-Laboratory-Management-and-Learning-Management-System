@@ -3,6 +3,7 @@ using System.IO;
 using System.Text;
 using System.Windows;
 using System.Windows.Threading;
+using System.Windows.Controls;
 
 namespace XPLabs.LockScreen
 {
@@ -10,6 +11,8 @@ namespace XPLabs.LockScreen
     {
         private readonly string _statePath =
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "XPLabsAgent", "state.json");
+        private readonly string _overrideRequestPath =
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "XPLabsAgent", "override_request.json");
 
         private readonly DispatcherTimer _timer = new DispatcherTimer();
         private KeyboardBlocker _blocker;
@@ -78,16 +81,58 @@ namespace XPLabs.LockScreen
                 InfoText.Text = string.IsNullOrWhiteSpace(lastLrn)
                     ? ""
                     : $"Last LRN: {lastLrn}  (last unlock: {lastUnlockAt})";
+                OverrideButton.Visibility = Visibility.Visible;
             }
             else
             {
                 _blocker.Disable();
                 StatusText.Text = "Unlocked";
                 InfoText.Text = "";
+                OverridePanel.Visibility = Visibility.Collapsed;
+                OverrideButton.Visibility = Visibility.Collapsed;
                 Hide();
             }
 
             _lastLocked = locked;
+        }
+
+        private void OverrideButton_Click(object sender, RoutedEventArgs e)
+        {
+            OverridePanel.Visibility = OverridePanel.Visibility == Visibility.Visible
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+            OverrideIdentifierInput.Focus();
+        }
+
+        private void SubmitOverrideButton_Click(object sender, RoutedEventArgs e)
+        {
+            var identifier = (OverrideIdentifierInput.Text ?? string.Empty).Trim();
+            var password = OverridePasswordInput.Password ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(identifier) || string.IsNullOrWhiteSpace(password))
+            {
+                StatusText.Text = "Provide user ID/email and password.";
+                return;
+            }
+
+            try
+            {
+                var payload = "{\"identifier\":\"" + EscapeJson(identifier) + "\",\"password\":\"" + EscapeJson(password) + "\"}";
+                Directory.CreateDirectory(Path.GetDirectoryName(_overrideRequestPath) ?? ".");
+                File.WriteAllText(_overrideRequestPath, payload, Encoding.UTF8);
+                StatusText.Text = "Override request submitted. Waiting for verification...";
+                OverridePasswordInput.Password = "";
+                OverridePanel.Visibility = Visibility.Collapsed;
+            }
+            catch
+            {
+                StatusText.Text = "Unable to submit override request.";
+            }
+        }
+
+        private static string EscapeJson(string value)
+        {
+            return value.Replace("\\", "\\\\").Replace("\"", "\\\"");
         }
     }
 }

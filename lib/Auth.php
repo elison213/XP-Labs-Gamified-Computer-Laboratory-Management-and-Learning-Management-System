@@ -260,4 +260,16 @@ class Auth
         $elapsed = time() - ($_SESSION['login_time'] ?? time());
         return max(0, $lifetime - $elapsed);
     }
+
+    /**
+     * Check whether current user can use PC override unlock.
+     */
+    public static function canUnlockPcOverride(): bool
+    {
+        if (!self::check()) {
+            return false;
+        }
+        $user = self::getInstance()->user();
+        return (int) ($user['can_unlock_pc_override'] ?? 0) === 1;
+    }
 }

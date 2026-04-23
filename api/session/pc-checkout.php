@@ -55,6 +55,11 @@ if (!$activeSession) {
     echo json_encode(['error' => 'No active session found for this user']);
     exit;
 }
+if ((int) $activeSession['pc_id'] !== (int) $pc['id']) {
+    http_response_code(403);
+    echo json_encode(['error' => 'Active session is bound to another PC']);
+    exit;
+}
 
 // Calculate session duration
 $checkinTime = strtotime($activeSession['checkin_time']);

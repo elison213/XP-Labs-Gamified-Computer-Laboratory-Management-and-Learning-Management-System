@@ -764,7 +764,7 @@ $activeSessions = $db->fetchAll(
     // Auto-refresh floor plan every 10 seconds
     setInterval(async function() {
         try {
-            const response = await fetch('/api/lab/stations<?= $selectedFloor ? "?floor_id=$selectedFloor" : "" ?>');
+            const response = await fetch('/api/lab/stations?public=1<?= $selectedFloor ? "&floor_id=$selectedFloor" : "" ?>');
             if (!response.ok) return;
             const data = await response.json();
 

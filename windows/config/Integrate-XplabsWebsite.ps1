@@ -80,6 +80,20 @@ function Ensure-IisReverseProxy([string]$HostHeader) {
   Write-Host "Install IIS URL Rewrite + ARR manually, then create reverse-proxy to http://127.0.0.1/xplabs/ if needed." -ForegroundColor Yellow
 }
 
+function Assert-Preflight([string]$XamppRoot, [string]$ProjectRoot) {
+  if (-not (Get-Command Get-NetFirewallRule -ErrorAction SilentlyContinue)) {
+    throw "This script must run in Windows PowerShell with NetSecurity cmdlets available."
+  }
+  if (-not (Test-Path $ProjectRoot)) { throw "Project path not found: $ProjectRoot" }
+  if (-not (Test-Path $XamppRoot)) { throw "XAMPP path not found: $XamppRoot" }
+  if (-not (Test-Path (Join-Path $XamppRoot 'apache\bin\httpd.exe'))) {
+    throw "Apache binary not found in XAMPP path: $XamppRoot"
+  }
+  if (-not (Test-Path (Join-Path $XamppRoot 'mysql\bin\mysql.exe'))) {
+    Write-Host "Warning: mysql.exe not found in XAMPP path. DB checks are skipped." -ForegroundColor Yellow
+  }
+}
+
 Assert-Admin
 
 Write-Host "== Integrating XPLabs website on this Windows Server ==" -ForegroundColor Cyan
@@ -89,6 +103,7 @@ Write-Host "XAMPP path: $XamppPath"
 
 if (-not (Test-Path $ProjectPath)) { throw "Project path not found: $ProjectPath" }
 if (-not (Test-Path $XamppPath)) { throw "XAMPP path not found: $XamppPath" }
+Assert-Preflight -XamppRoot $XamppPath -ProjectRoot $ProjectPath
 
 Ensure-Dir (Join-Path $ProjectPath "storage\logs")
 

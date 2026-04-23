@@ -12,6 +12,7 @@ This folder configures a **local-only** Windows Server instance to host XPLabs o
 - `Integrate-XplabsWebsite.ps1` — integrates the web app stack on server (DNS record, firewall, XAMPP services, optional IIS reverse-proxy checks).
 - `Integrate-XplabsDatabase.ps1` — creates/imports the `xplabs` database (dump import, or migration + seed).
 - `Configure-ClientMachine.ps1` — configures client DNS/network and validates reachability to `lab.local.xplabs.com`.
+- `Apply-LabStabilityUpdate.ps1` — single-script updater for this stability/security release (runs migrations, verifies schema, refreshes services/task, prints smoke checks).
 
 ## What this does (high-level)
 1. Sets the server’s **static IP** (prompted).
@@ -69,6 +70,13 @@ notepad .\db.config.json
 Behavior:
 - If dump exists: imports `xplabs_dump.sql`.
 - If no dump: runs `database\migrate.php` (if available), then applies `db/xplabs.post-import.seed.sql`.
+
+## One-script release update
+Use this when you only need to apply the latest app update on an existing server:
+
+```powershell
+.\Apply-LabStabilityUpdate.ps1 -ProjectPath "C:\xampp\htdocs\xplabs" -XamppPath "C:\xampp" -DatabaseName "xplabs" -DbUser "root"
+```
 
 ## Client machine config script
 On each client (run elevated):
@@ -148,4 +156,28 @@ On the server:
 
 ### PC agent (when ready)
 - Configure lab PCs using `windows/agent/agent.config.json` with `server_base_url` set to `http://lab.xplabs.com/xplabs`.
+
+## Post-run validation commands
+Run these after setup to verify critical dependencies:
+
+```powershell
+Get-Service Apache2.4,mysql | Format-Table Name,Status,StartType
+Resolve-DnsName local.xplabs.com
+Test-NetConnection local.xplabs.com -Port 80
+curl http://local.xplabs.com/xplabs/api/auth/me -UseBasicParsing
+```
+
+For machine API validation from a registered PC:
+
+```powershell
+$k = Get-Content "$env:ProgramData\XPLabsAgent\machine_key.txt" -ErrorAction Stop
+Invoke-RestMethod -Method GET -Uri "http://local.xplabs.com/xplabs/api/pc/config" -Headers @{ "X-Machine-Key" = $k }
+Invoke-RestMethod -Method GET -Uri "http://local.xplabs.com/xplabs/api/pc/commands" -Headers @{ "X-Machine-Key" = $k }
+```
+
+## Regression checklist before rollout
+- API auth: verify session-only endpoints reject unauthenticated calls.
+- Kiosk: verify unlock succeeds for enrolled student and fails for invalid LRN.
+- Force logout: verify command is queued and session ends.
+- Agent roundtrip: queue lock/unlock command and confirm command status changes to `executed`.
 

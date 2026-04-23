@@ -142,6 +142,32 @@ function Poll-Commands {
   return @()
 }
 
+function Process-OverrideUnlockRequest {
+  param([Parameter(Mandatory)] [string] $MachineKey)
+  $req = Get-OverrideRequest
+  if (-not $req) { return }
+
+  $identifier = [string]$req.identifier
+  $password = [string]$req.password
+  if ([string]::IsNullOrWhiteSpace($identifier) -or [string]::IsNullOrWhiteSpace($password)) {
+    Write-XplabsLog -Level warn -Message "Ignoring malformed override request"
+    Clear-OverrideRequest
+    return
+  }
+
+  try {
+    $res = Invoke-XplabsApi -Method 'POST' -Path '/api/session/override-unlock' -MachineKey $MachineKey -Body @{
+      identifier = $identifier
+      password   = $password
+    }
+    Write-XplabsLog -Level info -Message "Override unlock accepted: command_id=$($res.command_id)"
+  } catch {
+    Write-XplabsLog -Level warn -Message "Override unlock failed: $($_.Exception.Message)"
+  } finally {
+    Clear-OverrideRequest
+  }
+}
+
 $cfg = Get-XplabsConfig
 $machineKey = Ensure-Registered
 
@@ -183,6 +209,8 @@ while ($true) {
     }
     $lastPoll = $now
   }
+
+  Process-OverrideUnlockRequest -MachineKey $machineKey
 
   if (($now - $lastVal).TotalSeconds -ge $validateEvery) {
     $val = Validate-Access -MachineKey $machineKey -Cfg $cfg

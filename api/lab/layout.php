@@ -46,6 +46,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         echo json_encode(['error' => 'JSON body required']);
         exit;
     }
+    $stations = $input['stations'] ?? null;
+    if (is_array($stations) && count($stations) > 500) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Too many stations in payload']);
+        exit;
+    }
+    $grid = $input['grid'] ?? null;
+    if (is_array($grid)) {
+        $rows = (int) ($grid['rows'] ?? 0);
+        $cols = (int) ($grid['cols'] ?? 0);
+        if (($rows > 0 && $rows > 30) || ($cols > 0 && $cols > 30)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Grid dimensions exceed maximum limits']);
+            exit;
+        }
+    }
 
     $ok = $labService->saveFloorLayout($floorId, $input);
     if (!$ok) {

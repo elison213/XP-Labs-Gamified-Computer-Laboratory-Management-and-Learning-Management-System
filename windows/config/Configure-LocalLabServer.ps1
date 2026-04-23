@@ -152,6 +152,14 @@ function Ensure-WindowsPowerShell51 {
   }
 }
 
+function Assert-RequiredCmdlets {
+  foreach ($cmd in @('Get-NetAdapter', 'Set-DnsClientServerAddress', 'Get-WindowsFeature', 'Install-WindowsFeature')) {
+    if (-not (Get-Command $cmd -ErrorAction SilentlyContinue)) {
+      throw "Required cmdlet missing: $cmd"
+    }
+  }
+}
+
 function Resolve-AbsolutePathOrEmpty([string]$Path) {
   if (-not $Path) { return "" }
   try { return (Resolve-Path -Path $Path).Path } catch { return $Path }
@@ -229,6 +237,7 @@ try {
   Assert-Admin
   Assert-WindowsServer
   Ensure-WindowsPowerShell51
+  Assert-RequiredCmdlets
 
   $resumeTask = 'XPLabs-LocalLabServer-Resume'
   $scriptSelf = $MyInvocation.MyCommand.Path

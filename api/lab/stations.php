@@ -14,7 +14,10 @@ require_once __DIR__ . '/../../services/LabService.php';
 use XPLabs\Lib\Auth;
 use XPLabs\Services\LabService;
 
-Auth::require();
+$isPublic = isset($_GET['public']) && $_GET['public'] === '1';
+if (!$isPublic) {
+    Auth::require();
+}
 
 $labService = new LabService();
 
@@ -23,23 +26,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $stations = $labService->getStations($floorId);
 
     // Format for frontend
-    $formatted = array_map(function ($s) {
+    $formatted = array_map(function ($s) use ($isPublic) {
         $user = null;
         if (!empty($s['first_name'])) {
             $user = trim($s['first_name'] . ' ' . $s['last_name']);
         }
 
-        return [
+        $base = [
             'id' => $s['id'],
             'station_code' => $s['station_code'],
             'floor_id' => $s['floor_id'],
             'status' => $s['is_maintenance'] ? 'maintenance' : ($s['status'] ?? 'offline'),
-            'user' => $user,
-            'since' => $s['checkin_time'] ? date('H:i', strtotime($s['checkin_time'])) : null,
-            'task' => $s['task'] ?? null,
-            'hostname' => $s['hostname'] ?? null,
-            'ip_address' => $s['ip_address'] ?? null,
         ];
+        if ($isPublic) {
+            // Kiosk view only gets occupancy, no user/network metadata.
+            $base['occupied'] = $user !== null;
+            return $base;
+        }
+
+        $base['user'] = $user;
+        $base['since'] = $s['checkin_time'] ? date('H:i', strtotime($s['checkin_time'])) : null;
+        $base['task'] = $s['task'] ?? null;
+        $base['hostname'] = $s['hostname'] ?? null;
+        $base['ip_address'] = $s['ip_address'] ?? null;
+        return $base;
     }, $stations);
 
     echo json_encode(['stations' => $formatted]);
@@ -51,6 +61,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'PATCH') {
 
     $input = json_decode(file_get_contents('php://input'), true);
     $stationId = (int) ($input['id'] ?? ($_GET['id'] ?? 0));
+    if (!$stationId) {
+        $path = $_SERVER['REQUEST_URI'] ?? '';
+        if (preg_match('#/api/lab/stations/(\d+)#', $path, $m)) {
+            $stationId = (int) $m[1];
+        }
+    }
 
     if (!$stationId) {
         http_response_code(400);

@@ -92,6 +92,7 @@ return [
     'POST /api/session/pc-checkin' => 'api/session/pc-checkin.php',
     'POST /api/session/pc-checkout' => 'api/session/pc-checkout.php',
     'POST /api/session/force-logout' => 'api/session/force-logout.php',
+    'POST /api/session/override-unlock' => 'api/session/override-unlock.php',
     'GET  /api/access/drive-maps'  => 'api/access/drive-maps.php',
     'GET  /api/access/folder-rules' => 'api/access/folder-rules.php',
 

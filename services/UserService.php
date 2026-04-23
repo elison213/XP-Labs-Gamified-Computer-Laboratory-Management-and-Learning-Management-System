@@ -34,6 +34,34 @@ class UserService
     }
 
     /**
+     * Verify credentials for PC override flow and permission.
+     */
+    public function verifyPcOverrideCredentials(string $identifier, string $password): ?array
+    {
+        $identifier = trim($identifier);
+        if ($identifier === '' || $password === '') {
+            return null;
+        }
+
+        $user = $this->db->fetch(
+            "SELECT id, lrn, email, first_name, last_name, role, password_hash, is_active,
+                    COALESCE(can_unlock_pc_override, 0) AS can_unlock_pc_override
+             FROM users
+             WHERE (lrn = ? OR email = ?) AND is_active = 1
+             LIMIT 1",
+            [$identifier, $identifier]
+        );
+        if (!$user || empty($user['password_hash']) || !password_verify($password, $user['password_hash'])) {
+            return null;
+        }
+        if ((int) ($user['can_unlock_pc_override'] ?? 0) !== 1) {
+            return null;
+        }
+        unset($user['password_hash']);
+        return $user;
+    }
+
+    /**
      * List users with pagination.
      */
     public function list(array $filters = [], int $page = 1, int $perPage = 25): array

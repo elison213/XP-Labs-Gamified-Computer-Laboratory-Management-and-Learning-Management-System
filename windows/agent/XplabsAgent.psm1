@@ -11,6 +11,7 @@ function Get-XplabsPaths {
     ConfigPath = Join-Path $dataDir 'agent.config.json'
     KeyPath    = Join-Path $dataDir 'machine_key.txt'
     StatePath  = Join-Path $dataDir 'state.json'
+    OverrideRequestPath = Join-Path $dataDir 'override_request.json'
     LogPath    = Join-Path $logDir 'agent.log'
   }
 }
@@ -184,5 +185,17 @@ function Set-AgentState {
   Write-XplabsJsonFile -Path $p.StatePath -Object $State
 }
 
-Export-ModuleMember -Function *-Xplabs*, Get-HostIdentity, Get-SystemInfo, Get-AgentState, Set-AgentState
+function Get-OverrideRequest {
+  $p = Get-XplabsPaths
+  return Read-XplabsJsonFile -Path $p.OverrideRequestPath
+}
+
+function Clear-OverrideRequest {
+  $p = Get-XplabsPaths
+  if (Test-Path $p.OverrideRequestPath) {
+    Remove-Item -Path $p.OverrideRequestPath -Force -ErrorAction SilentlyContinue
+  }
+}
+
+Export-ModuleMember -Function *-Xplabs*, Get-HostIdentity, Get-SystemInfo, Get-AgentState, Set-AgentState, Get-OverrideRequest, Clear-OverrideRequest
 

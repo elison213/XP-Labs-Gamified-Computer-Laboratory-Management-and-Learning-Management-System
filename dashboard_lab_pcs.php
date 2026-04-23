@@ -336,7 +336,7 @@ $pcs = $db->fetchAll(
 
     async function lockPC(pcId) {
         try {
-            const res = await fetch('/api/lab/queue-command.php', {
+            const res = await fetch('/api/lab/queue-command', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
                 body: JSON.stringify({ pc_id: pcId, command_type: 'lock', issued_by: teacherId })
@@ -353,7 +353,7 @@ $pcs = $db->fetchAll(
 
     async function unlockPC(pcId) {
         try {
-            const res = await fetch('/api/lab/queue-command.php', {
+            const res = await fetch('/api/lab/queue-command', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
                 body: JSON.stringify({ pc_id: pcId, command_type: 'unlock', issued_by: teacherId })
@@ -379,7 +379,7 @@ $pcs = $db->fetchAll(
         if (!message) return;
 
         try {
-            const res = await fetch('/api/lab/queue-command.php', {
+            const res = await fetch('/api/lab/queue-command', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
                 body: JSON.stringify({ pc_id: pcId, command_type: 'message', issued_by: teacherId, params: { message } })
@@ -398,7 +398,7 @@ $pcs = $db->fetchAll(
     async function forceLogout(userId, lrn) {
         if (!confirm('Force logout this student?')) return;
         try {
-            const res = await fetch('/api/session/force-logout.php', {
+            const res = await fetch('/api/session/force-logout', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
                 body: JSON.stringify({ user_id: userId, lrn })
@@ -416,7 +416,7 @@ $pcs = $db->fetchAll(
     async function lockAllPCs() {
         if (!confirm('Lock all lab PCs?')) return;
         try {
-            const res = await fetch('/api/lab/queue-command.php', {
+            const res = await fetch('/api/lab/queue-command', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
                 body: JSON.stringify({ pc_id: 'all', command_type: 'lock', issued_by: teacherId })
@@ -433,7 +433,7 @@ $pcs = $db->fetchAll(
 
     async function unlockAllPCs() {
         try {
-            const res = await fetch('/api/lab/queue-command.php', {
+            const res = await fetch('/api/lab/queue-command', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
                 body: JSON.stringify({ pc_id: 'all', command_type: 'unlock', issued_by: teacherId })

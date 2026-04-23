@@ -53,7 +53,7 @@ if ($courseId) {
 }
 
 // Fun rating distribution (1-5 stars)
-$funDist = $db->fetchOne(
+$funDist = $db->fetch(
     "SELECT 
         SUM(CASE WHEN fun_rating = 1 THEN 1 ELSE 0 END) as s1,
         SUM(CASE WHEN fun_rating = 2 THEN 1 ELSE 0 END) as s2,
@@ -67,7 +67,7 @@ $funDist = $db->fetchOne(
 );
 
 // Difficulty breakdown
-$diff = $db->fetchOne(
+$diff = $db->fetch(
     "SELECT 
         SUM(CASE WHEN difficulty = 'easy' THEN 1 ELSE 0 END) as easy,
         SUM(CASE WHEN difficulty = 'medium' THEN 1 ELSE 0 END) as medium,
