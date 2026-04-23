@@ -7,6 +7,11 @@ This folder configures a **local-only** Windows Server instance to host XPLabs o
 - Windows Firewall rules for **DNS** and **HTTP/HTTPS**
 - XAMPP service checks (Apache/MySQL) so the webapp runs reliably
 
+## Scripts in this folder
+- `Configure-LocalLabServer.ps1` — one-click AD DS + DNS + server baseline setup.
+- `Integrate-XplabsWebsite.ps1` — integrates the web app stack on server (DNS record, firewall, XAMPP services, optional IIS reverse-proxy checks).
+- `Configure-ClientMachine.ps1` — configures client DNS/network and validates reachability to `lab.local.xplabs.com`.
+
 ## What this does (high-level)
 1. Sets the server’s **static IP** (prompted).
 2. Installs **AD DS** and **DNS Server** roles.
@@ -28,6 +33,30 @@ Run:
 ```powershell
 Set-ExecutionPolicy Bypass -Scope Process -Force
 .\Configure-LocalLabServer.ps1
+```
+
+## Website integration script
+On the server (after local domain setup):
+
+```powershell
+.\Integrate-XplabsWebsite.ps1 -SiteHost "lab.local.xplabs.com" -DnsZone "local.xplabs.com" -XamppPath "C:\xampp" -ProjectPath "C:\xampp\htdocs\xplabs"
+```
+
+Optional flags:
+- `-EnsureIisReverseProxy` (prepare IIS site guidance for ARR setup)
+- `-RunMigrations` (best-effort call to `database\migrate.php` if `php` is available)
+
+## Client machine config script
+On each client (run elevated):
+
+```powershell
+.\Configure-ClientMachine.ps1 -ServerDnsName "lab.local.xplabs.com" -ServerIp "192.168.1.10" -DnsServerIp "192.168.1.10"
+```
+
+If you need a static client IP:
+
+```powershell
+.\Configure-ClientMachine.ps1 -ServerDnsName "lab.local.xplabs.com" -ServerIp "192.168.1.10" -DnsServerIp "192.168.1.10" -SetStaticClientIp -ClientIp "192.168.1.20" -PrefixLength 24 -DefaultGateway "192.168.1.1"
 ```
 
 ## Config-file mode

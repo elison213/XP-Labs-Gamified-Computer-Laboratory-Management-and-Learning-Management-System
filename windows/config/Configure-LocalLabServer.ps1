@@ -1,9 +1,28 @@
 param(
-  [string] $ConfigPath = ""
+  [string] $ConfigPath = "",
+  [switch] $NoPause
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$script:LogDir = Join-Path $env:ProgramData 'XPLabsAgent\logs'
+$script:LogPath = Join-Path $script:LogDir ("Configure-LocalLabServer_{0}.log" -f (Get-Date -Format 'yyyyMMdd_HHmmss'))
+
+function Ensure-LogDir {
+  if (-not (Test-Path $script:LogDir)) {
+    New-Item -Path $script:LogDir -ItemType Directory -Force | Out-Null
+  }
+}
+
+function Fail-And-Pause([string]$Message) {
+  Write-Host ""
+  Write-Host "ERROR: $Message" -ForegroundColor Red
+  Write-Host "Log file: $script:LogPath" -ForegroundColor Yellow
+  if (-not $NoPause) {
+    Write-Host ""
+    Read-Host "Press Enter to exit"
+  }
+}
 
 function Assert-Admin {
   $id = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -53,6 +72,27 @@ function Set-StaticIp($cfgNet) {
   $gw = $cfgNet.defaultGateway
   $dns = @($cfgNet.dnsServers)
 
+  $adapter = Get-NetAdapter -Name $alias -ErrorAction SilentlyContinue
+  if (-not $adapter) {
+    $up = @(Get-NetAdapter -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq 'Up' })
+    if ($up.Count -eq 1) {
+      $alias = $up[0].Name
+      Write-Host "Interface alias '$($cfgNet.interfaceAlias)' not found. Auto-selected active adapter: $alias" -ForegroundColor Yellow
+    } elseif ($up.Count -gt 1) {
+      Write-Host "Interface alias '$($cfgNet.interfaceAlias)' not found. Available active adapters:" -ForegroundColor Yellow
+      $up | ForEach-Object { Write-Host " - $($_.Name)" }
+      $alias = Read-Host "Enter adapter name to configure"
+    } else {
+      $all = @(Get-NetAdapter -ErrorAction SilentlyContinue)
+      if ($all) {
+        Write-Host "No active adapter auto-selected. Available adapters:" -ForegroundColor Yellow
+        $all | ForEach-Object { Write-Host " - $($_.Name) [$($_.Status)]" }
+        $alias = Read-Host "Enter adapter name to configure"
+      } else {
+        throw "No network adapters detected."
+      }
+    }
+  }
   $adapter = Get-NetAdapter -Name $alias -ErrorAction Stop
   if ($adapter.Status -ne 'Up') {
     Write-Host "Warning: adapter '$alias' is not Up (status=$($adapter.Status))." -ForegroundColor Yellow
@@ -117,6 +157,23 @@ function Resolve-AbsolutePathOrEmpty([string]$Path) {
   try { return (Resolve-Path -Path $Path).Path } catch { return $Path }
 }
 
+function Test-PendingReboot {
+  $paths = @(
+    'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending',
+    'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired'
+  )
+  foreach ($p in $paths) {
+    if (Test-Path $p) { return $true }
+  }
+
+  try {
+    $pending = (Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager' -Name 'PendingFileRenameOperations' -ErrorAction SilentlyContinue)
+    if ($pending -and $pending.PendingFileRenameOperations) { return $true }
+  } catch {}
+
+  return $false
+}
+
 function Ensure-DnsZoneAndRecord($cfgDns) {
   $zone = $cfgDns.zone
   $host = $cfgDns.host
@@ -160,26 +217,30 @@ function Ensure-XamppServices($cfgXampp) {
       Set-Service -Name $svcName -StartupType Automatic
     }
     if ($svc.Status -ne 'Running') {
-      try { Start-Service -Name $svcName } catch { Write-Host "Failed to start service $svcName: $($_.Exception.Message)" -ForegroundColor Yellow }
+      try { Start-Service -Name $svcName } catch { Write-Host "Failed to start service ${svcName}: $($_.Exception.Message)" -ForegroundColor Yellow }
     }
   }
 }
 
-Assert-Admin
-Assert-WindowsServer
-Ensure-WindowsPowerShell51
+try {
+  Ensure-LogDir
+  Start-Transcript -Path $script:LogPath -Append -Force | Out-Null
 
-$resumeTask = 'XPLabs-LocalLabServer-Resume'
-$scriptSelf = $MyInvocation.MyCommand.Path
-$ConfigPath = Resolve-AbsolutePathOrEmpty -Path $ConfigPath
+  Assert-Admin
+  Assert-WindowsServer
+  Ensure-WindowsPowerShell51
 
-# Load config (file or interactive)
-$cfg = $null
-if ($ConfigPath -and $ConfigPath.Trim().Length -gt 0) {
-  $cfg = Read-JsonFile -Path $ConfigPath
-} else {
+  $resumeTask = 'XPLabs-LocalLabServer-Resume'
+  $scriptSelf = $MyInvocation.MyCommand.Path
+  $ConfigPath = Resolve-AbsolutePathOrEmpty -Path $ConfigPath
+
+  # Load config (file or interactive)
+  $cfg = $null
+  if ($ConfigPath -and $ConfigPath.Trim().Length -gt 0) {
+    $cfg = Read-JsonFile -Path $ConfigPath
+  } else {
   # Minimal interactive config
-  $cfg = [pscustomobject]@{
+    $cfg = [pscustomobject]@{
     domain = [pscustomobject]@{
       fqdn = ''
       netbios = ''
@@ -209,83 +270,107 @@ if ($ConfigPath -and $ConfigPath.Trim().Length -gt 0) {
     }
   }
 
-  $cfg.domain.fqdn = Prompt-IfEmpty $cfg.domain.fqdn "AD domain FQDN (example: xplabs.com)"
-  $cfg.domain.netbios = Prompt-IfEmpty $cfg.domain.netbios "AD NetBIOS name (example: XPLABS)"
-  $cfg.domain.safeModeAdminPassword = Prompt-IfEmpty $cfg.domain.safeModeAdminPassword "DSRM (Safe Mode) password" -Secret
+    $cfg.domain.fqdn = Prompt-IfEmpty $cfg.domain.fqdn "AD domain FQDN (example: xplabs.com)"
+    $cfg.domain.netbios = Prompt-IfEmpty $cfg.domain.netbios "AD NetBIOS name (example: XPLABS)"
+    $cfg.domain.safeModeAdminPassword = Prompt-IfEmpty $cfg.domain.safeModeAdminPassword "DSRM (Safe Mode) password" -Secret
 
-  $cfg.network.interfaceAlias = Prompt-IfEmpty $cfg.network.interfaceAlias "Network interface alias (Get-NetAdapter)" 
-  $cfg.network.ipAddress = Prompt-IfEmpty $cfg.network.ipAddress "Static IP for server (example: 192.168.1.50)"
-  $cfg.network.defaultGateway = Prompt-IfEmpty $cfg.network.defaultGateway "Default gateway (example: 192.168.1.1)"
-  $cfg.dns.zone = Prompt-IfEmpty $cfg.dns.zone "DNS zone name (default: same as domain)" 
-  if (-not $cfg.dns.zone) { $cfg.dns.zone = $cfg.domain.fqdn }
-  $cfg.dns.host = Prompt-IfEmpty $cfg.dns.host "DNS host record (default: lab)"
-  if (-not $cfg.dns.host) { $cfg.dns.host = 'lab' }
-  $cfg.dns.aRecordIp = Prompt-IfEmpty $cfg.dns.aRecordIp "A record IPv4 (default: server static IP)"
-  if (-not $cfg.dns.aRecordIp) { $cfg.dns.aRecordIp = $cfg.network.ipAddress }
-  $cfg.network.dnsServers = @($cfg.network.ipAddress)
-}
-
-Write-Host "== XPLabs Local Lab Server configuration ==" -ForegroundColor Cyan
-Write-Host "Domain: $($cfg.domain.fqdn)  NetBIOS: $($cfg.domain.netbios)"
-Write-Host "Server IP: $($cfg.network.ipAddress)  Adapter: $($cfg.network.interfaceAlias)"
-Write-Host "DNS: $($cfg.dns.host).$($cfg.dns.zone) -> $($cfg.dns.aRecordIp)"
-
-# Phase 1: static IP + install roles
-Write-Host "Configuring static IP/DNS..." -ForegroundColor Cyan
-Set-StaticIp -cfgNet $cfg.network
-
-Write-Host "Installing AD DS + DNS roles..." -ForegroundColor Cyan
-Ensure-Feature -Name 'AD-Domain-Services'
-Ensure-Feature -Name 'DNS'
-
-# Phase 2: promote to DC (requires reboot)
-if (-not (Is-DomainController)) {
-  Write-Host "Promoting to Domain Controller (will reboot)..." -ForegroundColor Cyan
-  Import-Module ADDSDeployment
-
-  # Ensure script resumes after reboot
-  $args = ""
-  if ($ConfigPath -and $ConfigPath.Trim().Length -gt 0) {
-    $args = "-ConfigPath `"$ConfigPath`""
+    $cfg.network.interfaceAlias = Prompt-IfEmpty $cfg.network.interfaceAlias "Network interface alias (Get-NetAdapter)" 
+    $cfg.network.ipAddress = Prompt-IfEmpty $cfg.network.ipAddress "Static IP for server (example: 192.168.1.50)"
+    $cfg.network.defaultGateway = Prompt-IfEmpty $cfg.network.defaultGateway "Default gateway (example: 192.168.1.1)"
+    $cfg.dns.zone = Prompt-IfEmpty $cfg.dns.zone "DNS zone name (default: same as domain)" 
+    if (-not $cfg.dns.zone) { $cfg.dns.zone = $cfg.domain.fqdn }
+    $cfg.dns.host = Prompt-IfEmpty $cfg.dns.host "DNS host record (default: lab)"
+    if (-not $cfg.dns.host) { $cfg.dns.host = 'lab' }
+    $cfg.dns.aRecordIp = Prompt-IfEmpty $cfg.dns.aRecordIp "A record IPv4 (default: server static IP)"
+    if (-not $cfg.dns.aRecordIp) { $cfg.dns.aRecordIp = $cfg.network.ipAddress }
+    $cfg.network.dnsServers = @($cfg.network.ipAddress)
   }
-  Ensure-ResumeTask -TaskName $resumeTask -ScriptPath $scriptSelf -Args $args
 
-  $sec = ConvertTo-SecureString $cfg.domain.safeModeAdminPassword -AsPlainText -Force
+  Write-Host "== XPLabs Local Lab Server configuration ==" -ForegroundColor Cyan
+  Write-Host "Domain: $($cfg.domain.fqdn)  NetBIOS: $($cfg.domain.netbios)"
+  Write-Host "Server IP: $($cfg.network.ipAddress)  Adapter: $($cfg.network.interfaceAlias)"
+  Write-Host "DNS: $($cfg.dns.host).$($cfg.dns.zone) -> $($cfg.dns.aRecordIp)"
 
-  Install-ADDSForest `
-    -DomainName $cfg.domain.fqdn `
-    -DomainNetbiosName $cfg.domain.netbios `
-    -SafeModeAdministratorPassword $sec `
-    -InstallDns:$true `
-    -Force:$true
+  # Phase 1: static IP + install roles
+  Write-Host "Configuring static IP/DNS..." -ForegroundColor Cyan
+  Set-StaticIp -cfgNet $cfg.network
 
-  # Install-ADDSForest will trigger reboot automatically.
-  exit
+  Write-Host "Installing AD DS + DNS roles..." -ForegroundColor Cyan
+  Ensure-Feature -Name 'AD-Domain-Services'
+  Ensure-Feature -Name 'DNS'
+
+  # Feature install may require reboot before AD DS promotion.
+  if (Test-PendingReboot) {
+    Write-Host "Reboot required before domain promotion. Scheduling resume task and rebooting..." -ForegroundColor Yellow
+    $args = ""
+    if ($ConfigPath -and $ConfigPath.Trim().Length -gt 0) {
+      $args = "-ConfigPath `"$ConfigPath`" -NoPause"
+    } else {
+      $args = "-NoPause"
+    }
+    Ensure-ResumeTask -TaskName $resumeTask -ScriptPath $scriptSelf -Args $args
+    Restart-Computer -Force
+    exit
+  }
+
+  # Phase 2: promote to DC (requires reboot)
+  if (-not (Is-DomainController)) {
+    Write-Host "Promoting to Domain Controller (will reboot)..." -ForegroundColor Cyan
+    Import-Module ADDSDeployment
+
+    # Ensure script resumes after reboot
+    $args = ""
+    if ($ConfigPath -and $ConfigPath.Trim().Length -gt 0) {
+      $args = "-ConfigPath `"$ConfigPath`" -NoPause"
+    } else {
+      $args = "-NoPause"
+    }
+    Ensure-ResumeTask -TaskName $resumeTask -ScriptPath $scriptSelf -Args $args
+
+    $sec = ConvertTo-SecureString $cfg.domain.safeModeAdminPassword -AsPlainText -Force
+
+    Install-ADDSForest `
+      -DomainName $cfg.domain.fqdn `
+      -DomainNetbiosName $cfg.domain.netbios `
+      -SafeModeAdministratorPassword $sec `
+      -InstallDns:$true `
+      -Force:$true
+
+    # Install-ADDSForest will trigger reboot automatically.
+    exit
+  }
+
+  # Phase 3: post-promotion tasks
+  Write-Host "Post-promotion tasks..." -ForegroundColor Cyan
+  Remove-ResumeTask -TaskName $resumeTask
+
+  try { Import-Module DNSServer -ErrorAction Stop } catch {}
+
+  Write-Host "Ensuring DNS zone + A record..." -ForegroundColor Cyan
+  Ensure-DnsZoneAndRecord -cfgDns $cfg.dns
+
+  Write-Host "Configuring firewall rules..." -ForegroundColor Cyan
+  if ($cfg.firewall.openDns) {
+    Ensure-FirewallRule -Name 'XPLabs-DNS-TCP' -DisplayName 'XPLabs DNS (TCP 53)' -Protocol 'TCP' -LocalPort '53'
+    Ensure-FirewallRule -Name 'XPLabs-DNS-UDP' -DisplayName 'XPLabs DNS (UDP 53)' -Protocol 'UDP' -LocalPort '53'
+  }
+  if ($cfg.firewall.openHttp) { Ensure-FirewallRule -Name 'XPLabs-HTTP' -DisplayName 'XPLabs HTTP (TCP 80)' -Protocol 'TCP' -LocalPort '80' }
+  if ($cfg.firewall.openHttps) { Ensure-FirewallRule -Name 'XPLabs-HTTPS' -DisplayName 'XPLabs HTTPS (TCP 443)' -Protocol 'TCP' -LocalPort '443' }
+
+  Write-Host "Checking XAMPP services..." -ForegroundColor Cyan
+  Ensure-XamppServices -cfgXampp $cfg.xampp
+
+  Write-Host "Validation hints:" -ForegroundColor Green
+  Write-Host " - Resolve-DnsName $($cfg.dns.host).$($cfg.dns.zone)"
+  Write-Host " - From a client: browse http://$($cfg.dns.host).$($cfg.dns.zone)/xplabs/"
+
+  Write-Host "Done." -ForegroundColor Green
 }
-
-# Phase 3: post-promotion tasks
-Write-Host "Post-promotion tasks..." -ForegroundColor Cyan
-Remove-ResumeTask -TaskName $resumeTask
-
-try { Import-Module DNSServer -ErrorAction Stop } catch {}
-
-Write-Host "Ensuring DNS zone + A record..." -ForegroundColor Cyan
-Ensure-DnsZoneAndRecord -cfgDns $cfg.dns
-
-Write-Host "Configuring firewall rules..." -ForegroundColor Cyan
-if ($cfg.firewall.openDns) {
-  Ensure-FirewallRule -Name 'XPLabs-DNS-TCP' -DisplayName 'XPLabs DNS (TCP 53)' -Protocol 'TCP' -LocalPort '53'
-  Ensure-FirewallRule -Name 'XPLabs-DNS-UDP' -DisplayName 'XPLabs DNS (UDP 53)' -Protocol 'UDP' -LocalPort '53'
+catch {
+  Fail-And-Pause -Message $_.Exception.Message
+  exit 1
 }
-if ($cfg.firewall.openHttp) { Ensure-FirewallRule -Name 'XPLabs-HTTP' -DisplayName 'XPLabs HTTP (TCP 80)' -Protocol 'TCP' -LocalPort '80' }
-if ($cfg.firewall.openHttps) { Ensure-FirewallRule -Name 'XPLabs-HTTPS' -DisplayName 'XPLabs HTTPS (TCP 443)' -Protocol 'TCP' -LocalPort '443' }
-
-Write-Host "Checking XAMPP services..." -ForegroundColor Cyan
-Ensure-XamppServices -cfgXampp $cfg.xampp
-
-Write-Host "Validation hints:" -ForegroundColor Green
-Write-Host " - Resolve-DnsName $($cfg.dns.host).$($cfg.dns.zone)"
-Write-Host " - From a client: browse http://$($cfg.dns.host).$($cfg.dns.zone)/xplabs/"
-
-Write-Host "Done." -ForegroundColor Green
+finally {
+  try { Stop-Transcript | Out-Null } catch {}
+}
 
