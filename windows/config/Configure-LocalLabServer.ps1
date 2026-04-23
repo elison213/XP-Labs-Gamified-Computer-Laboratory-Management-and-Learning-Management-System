@@ -176,7 +176,7 @@ function Test-PendingReboot {
 
 function Ensure-DnsZoneAndRecord($cfgDns) {
   $zone = $cfgDns.zone
-  $host = $cfgDns.host
+  $recordHost = $cfgDns.host
   $ip = $cfgDns.aRecordIp
 
   $z = Get-DnsServerZone -Name $zone -ErrorAction SilentlyContinue
@@ -184,15 +184,15 @@ function Ensure-DnsZoneAndRecord($cfgDns) {
     Add-DnsServerPrimaryZone -Name $zone -ReplicationScope 'Domain' | Out-Null
   }
 
-  $existing = Get-DnsServerResourceRecord -ZoneName $zone -Name $host -RRType 'A' -ErrorAction SilentlyContinue
+  $existing = Get-DnsServerResourceRecord -ZoneName $zone -Name $recordHost -RRType 'A' -ErrorAction SilentlyContinue
   if (-not $existing) {
-    Add-DnsServerResourceRecordA -ZoneName $zone -Name $host -IPv4Address $ip | Out-Null
+    Add-DnsServerResourceRecordA -ZoneName $zone -Name $recordHost -IPv4Address $ip | Out-Null
   } else {
     # Best-effort: update if different
     $currentIp = ($existing | Where-Object { $_.RecordType -eq 'A' } | Select-Object -First 1).RecordData.IPv4Address.IPAddressToString
     if ($currentIp -ne $ip) {
-      Remove-DnsServerResourceRecord -ZoneName $zone -RRType 'A' -Name $host -RecordData $currentIp -Force -ErrorAction SilentlyContinue | Out-Null
-      Add-DnsServerResourceRecordA -ZoneName $zone -Name $host -IPv4Address $ip | Out-Null
+      Remove-DnsServerResourceRecord -ZoneName $zone -RRType 'A' -Name $recordHost -RecordData $currentIp -Force -ErrorAction SilentlyContinue | Out-Null
+      Add-DnsServerResourceRecordA -ZoneName $zone -Name $recordHost -IPv4Address $ip | Out-Null
     }
   }
 }

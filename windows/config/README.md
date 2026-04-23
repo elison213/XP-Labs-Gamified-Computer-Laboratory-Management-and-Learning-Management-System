@@ -10,6 +10,7 @@ This folder configures a **local-only** Windows Server instance to host XPLabs o
 ## Scripts in this folder
 - `Configure-LocalLabServer.ps1` — one-click AD DS + DNS + server baseline setup.
 - `Integrate-XplabsWebsite.ps1` — integrates the web app stack on server (DNS record, firewall, XAMPP services, optional IIS reverse-proxy checks).
+- `Integrate-XplabsDatabase.ps1` — creates/imports the `xplabs` database (dump import, or migration + seed).
 - `Configure-ClientMachine.ps1` — configures client DNS/network and validates reachability to `lab.local.xplabs.com`.
 
 ## What this does (high-level)
@@ -45,6 +46,21 @@ On the server (after local domain setup):
 Optional flags:
 - `-EnsureIisReverseProxy` (prepare IIS site guidance for ARR setup)
 - `-RunMigrations` (best-effort call to `database\migrate.php` if `php` is available)
+
+## Database integration script
+Database package location:
+- `windows/config/db/`
+- put your full dump as: `windows/config/db/xplabs_dump.sql` (optional)
+
+Run:
+
+```powershell
+.\Integrate-XplabsDatabase.ps1 -ProjectPath "C:\xampp\htdocs\xplabs" -XamppPath "C:\xampp" -DatabaseName "xplabs" -DbUser "root"
+```
+
+Behavior:
+- If dump exists: imports `xplabs_dump.sql`.
+- If no dump: runs `database\migrate.php` (if available), then applies `db/xplabs.post-import.seed.sql`.
 
 ## Client machine config script
 On each client (run elevated):
