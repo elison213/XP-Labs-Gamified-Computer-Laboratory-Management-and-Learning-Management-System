@@ -1,0 +1,74 @@
+<Window x:Class="XPLabs.Widget.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="XPLabs Agent Widget"
+        Width="360"
+        Height="460"
+        MinWidth="320"
+        MinHeight="380"
+        Topmost="False"
+        WindowStartupLocation="Manual"
+        Background="#0F172A">
+  <Grid Margin="12">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+
+    <Border Background="#1E293B" BorderBrush="#334155" BorderThickness="1" CornerRadius="10" Padding="10">
+      <StackPanel>
+        <TextBlock Text="XPLabs Agent" Foreground="#A5B4FC" FontSize="18" FontWeight="SemiBold"/>
+        <TextBlock x:Name="StatusText" Text="Checking status..." Foreground="#E2E8F0" Margin="0,6,0,0"/>
+      </StackPanel>
+    </Border>
+
+    <Border Grid.Row="1" Background="#1E293B" BorderBrush="#334155" BorderThickness="1" CornerRadius="10" Padding="10" Margin="0,10,0,0">
+      <StackPanel>
+        <TextBlock x:Name="PcText" Text="PC: -" Foreground="#E2E8F0"/>
+        <TextBlock x:Name="UserText" Text="User: -" Foreground="#E2E8F0" Margin="0,4,0,0"/>
+        <TextBlock x:Name="SubjectText" Text="Subject: -" Foreground="#E2E8F0" Margin="0,4,0,0"/>
+        <TextBlock x:Name="HeartbeatText" Text="Last server time: -" Foreground="#94A3B8" Margin="0,4,0,0"/>
+      </StackPanel>
+    </Border>
+
+    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,10,0,0">
+      <Button x:Name="OpenSiteButton" Content="Open Website" Width="110" Height="32" Click="OpenSiteButton_Click"/>
+      <Button x:Name="RefreshButton" Content="Refresh" Width="80" Height="32" Margin="8,0,0,0" Click="RefreshButton_Click"/>
+      <CheckBox x:Name="AlwaysOnTopCheck" Content="Always On Top" Margin="10,7,0,0" Foreground="#E2E8F0" IsChecked="False" Checked="AlwaysOnTopCheck_Changed" Unchecked="AlwaysOnTopCheck_Changed"/>
+    </StackPanel>
+
+    <Border Grid.Row="3" x:Name="AdminBanner" Background="#3F1D1D" BorderBrush="#7F1D1D" BorderThickness="1" CornerRadius="8" Padding="8" Margin="0,10,0,0" Visibility="Collapsed">
+      <TextBlock x:Name="AdminBannerText" Text="Logs are visible for administrators only." Foreground="#FCA5A5" TextWrapping="Wrap"/>
+    </Border>
+
+    <Border Grid.Row="4" x:Name="LogsPanel" Background="#111827" BorderBrush="#334155" BorderThickness="1" CornerRadius="10" Padding="8" Margin="0,10,0,0" Visibility="Collapsed">
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,6">
+          <Button x:Name="ExportLogsButton" Content="Export Logs" Width="90" Height="26" Click="ExportLogsButton_Click"/>
+          <Button x:Name="CopyErrorsButton" Content="Copy Errors" Width="90" Height="26" Margin="8,0,0,0" Click="CopyErrorsButton_Click"/>
+        </StackPanel>
+        <TextBox x:Name="LogsTextBox"
+                 IsReadOnly="True"
+                 FontFamily="Consolas"
+                 FontSize="12"
+                 Foreground="#E5E7EB"
+                 Background="#111827"
+                 BorderThickness="0"
+                 VerticalScrollBarVisibility="Auto"
+                 HorizontalScrollBarVisibility="Auto"
+                 TextWrapping="NoWrap"
+                 AcceptsReturn="True"/>
+      </DockPanel>
+    </Border>
+
+    <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+      <Button x:Name="ToggleLogsButton" Content="Show Logs" Width="92" Height="30" Click="ToggleLogsButton_Click"/>
+      <Button Content="Hide" Width="72" Height="30" Margin="8,0,0,0" Click="HideButton_Click"/>
+    </StackPanel>
+  </Grid>
+</Window>
+

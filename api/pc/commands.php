@@ -27,7 +27,24 @@ $pcService = new PCService();
 // GET: Get pending commands
 // =====================================================
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    $commands = $pcService->getPendingCommands($pc['id']);
+    $afterCursor = isset($_GET['after_cursor']) ? (int) $_GET['after_cursor'] : 0;
+    if ($afterCursor < 0) {
+        $afterCursor = 0;
+    }
+    $commands = $pcService->getPendingCommandsAfterCursor((int) $pc['id'], $afterCursor);
+    $nextCursor = $afterCursor;
+    foreach ($commands as $cmd) {
+        $id = (int) ($cmd['id'] ?? 0);
+        if ($id > $nextCursor) {
+            $nextCursor = $id;
+        }
+    }
+    $pcService->emitProtocolDebugEvent((int) $pc['id'], 'command_cursor_poll', 'info', [
+        'pc_id' => (int) $pc['id'],
+        'request_cursor' => $afterCursor,
+        'next_cursor' => $nextCursor,
+        'commands_count' => count($commands),
+    ]);
 
     echo json_encode([
         'success' => true,
@@ -41,6 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             ];
         }, $commands),
         'count' => count($commands),
+        'next_cursor' => $nextCursor,
     ]);
     exit;
 }
@@ -84,8 +102,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($command['status'] !== 'pending') {
-        http_response_code(400);
-        echo json_encode(['error' => 'Command already processed']);
+        $pcService->emitProtocolDebugEvent((int) $pc['id'], 'command_ack_duplicate', 'info', [
+            'pc_id' => (int) $pc['id'],
+            'command_id' => $commandId,
+            'requested_status' => $status,
+        ]);
+        echo json_encode([
+            'success' => true,
+            'already_processed' => true,
+            'message' => 'Command already processed',
+        ]);
         exit;
     }
 
@@ -95,6 +121,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $pcService->failCommand($commandId, $result ?? 'Execution failed');
     }
+    $pcService->emitProtocolDebugEvent((int) $pc['id'], 'command_ack_processed', 'info', [
+        'pc_id' => (int) $pc['id'],
+        'command_id' => $commandId,
+        'status' => $status,
+    ]);
 
     // If it was a lock/unlock command, update PC status
     if ($command['command_type'] === 'lock') {

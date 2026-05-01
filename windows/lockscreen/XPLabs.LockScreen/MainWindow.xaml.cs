@@ -4,6 +4,7 @@ using System.Text;
 using System.Windows;
 using System.Windows.Threading;
 using System.Windows.Controls;
+using System.Diagnostics;
 
 namespace XPLabs.LockScreen
 {
@@ -17,6 +18,7 @@ namespace XPLabs.LockScreen
         private readonly DispatcherTimer _timer = new DispatcherTimer();
         private KeyboardBlocker _blocker;
         private bool _lastLocked = true;
+        private int _stateReadFailures = 0;
 
         public MainWindow()
         {
@@ -26,10 +28,26 @@ namespace XPLabs.LockScreen
             {
                 MakeFullscreen();
                 _blocker = new KeyboardBlocker();
-                _timer.Interval = TimeSpan.FromSeconds(1);
+                _timer.Interval = TimeSpan.FromMilliseconds(500);
                 _timer.Tick += (_, __2) => RefreshState();
                 _timer.Start();
                 RefreshState();
+            };
+
+            Deactivated += (_, __) =>
+            {
+                if (_lastLocked)
+                {
+                    KeepForeground();
+                }
+            };
+
+            StateChanged += (_, __) =>
+            {
+                if (_lastLocked && WindowState != WindowState.Maximized)
+                {
+                    WindowState = WindowState.Maximized;
+                }
             };
 
             Closing += (_, e) =>
@@ -46,6 +64,28 @@ namespace XPLabs.LockScreen
             Top = 0;
             Topmost = true;
             Focus();
+            Activate();
+            KeepForeground();
+        }
+
+        private void KeepForeground()
+        {
+            Topmost = false;
+            Topmost = true;
+            Activate();
+            Focus();
+        }
+
+        private static bool IsExplorerRunning()
+        {
+            try
+            {
+                return Process.GetProcessesByName("explorer").Length > 0;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private void RefreshState()
@@ -62,11 +102,17 @@ namespace XPLabs.LockScreen
                     locked = JsonTiny.TryGetBool(json, "locked", defaultValue: true);
                     lastLrn = JsonTiny.TryGetString(json, "last_lrn", defaultValue: "");
                     lastUnlockAt = JsonTiny.TryGetString(json, "last_unlock_at", defaultValue: "");
+                    _stateReadFailures = 0;
                 }
             }
             catch
             {
-                // ignore
+                _stateReadFailures++;
+                if (_stateReadFailures > 3)
+                {
+                    // Fail-safe: remain locked when state cannot be read repeatedly.
+                    locked = true;
+                }
             }
 
             if (locked)
@@ -81,7 +127,12 @@ namespace XPLabs.LockScreen
                 InfoText.Text = string.IsNullOrWhiteSpace(lastLrn)
                     ? ""
                     : $"Last LRN: {lastLrn}  (last unlock: {lastUnlockAt})";
+                if (IsExplorerRunning())
+                {
+                    InfoText.Text = (InfoText.Text + " Explorer shell detected; lockscreen enforcing foreground.").Trim();
+                }
                 OverrideButton.Visibility = Visibility.Visible;
+                KeepForeground();
             }
             else
             {
@@ -111,7 +162,7 @@ namespace XPLabs.LockScreen
 
             if (string.IsNullOrWhiteSpace(identifier) || string.IsNullOrWhiteSpace(password))
             {
-                StatusText.Text = "Provide user ID/email and password.";
+                StatusText.Text = "Provide admin ID/email and password.";
                 return;
             }
 
@@ -120,7 +171,7 @@ namespace XPLabs.LockScreen
                 var payload = "{\"identifier\":\"" + EscapeJson(identifier) + "\",\"password\":\"" + EscapeJson(password) + "\"}";
                 Directory.CreateDirectory(Path.GetDirectoryName(_overrideRequestPath) ?? ".");
                 File.WriteAllText(_overrideRequestPath, payload, Encoding.UTF8);
-                StatusText.Text = "Override request submitted. Waiting for verification...";
+                StatusText.Text = "Admin override request submitted. Waiting for verification...";
                 OverridePasswordInput.Password = "";
                 OverridePanel.Visibility = Visibility.Collapsed;
             }

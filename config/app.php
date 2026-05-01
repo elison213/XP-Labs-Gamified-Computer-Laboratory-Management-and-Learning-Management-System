@@ -54,4 +54,30 @@ return [
         // If left 0, the API will fall back to the first active admin user.
         'issued_by_user_id' => 0,
     ],
+
+    // Auto-deployment policy for lab agent rollout
+    'pc_auto_deploy' => [
+        'enabled' => true,
+        // If non-empty, only IPs in these CIDR ranges are eligible.
+        'allow_subnets' => [
+            // e.g. '192.168.100.0/24'
+        ],
+        // Always excluded from auto deployment.
+        'deny_subnets' => [
+            // e.g. '192.168.200.0/24' // AP/infra VLAN
+        ],
+        // Optional tag blocks from discovery/manual labeling.
+        'deny_tags' => ['access_point_vlan', 'infra', 'exclude_auto_deploy'],
+        // If true and no allow_subnets match, deny unknown networks.
+        'default_deny_unknown_networks' => false,
+        // Safety controls for bulk operations.
+        'max_bulk_jobs_per_request' => 25,
+        'max_parallel_jobs' => 5,
+    ],
+
+    // Protocol debug trace settings
+    'pc_protocol_debug' => [
+        'enabled' => true,
+        'retention_days' => 14,
+    ],
 ];

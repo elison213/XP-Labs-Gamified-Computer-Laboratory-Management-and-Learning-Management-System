@@ -1,8 +1,9 @@
 <?php
 /**
  * XPLabs API - POST /api/pc/heartbeat
- * Report PC status and receive pending commands.
- * Requires X-Machine-Key header authentication.
+ * MeshCentral-style check-in contract:
+ * - idempotent via heartbeat_id
+ * - returns ack_id + command cursor + pending commands
  */
 
 require_once __DIR__ . '/../../lib/Database.php';
@@ -30,52 +31,20 @@ $pc = MachineAuth::require();
 
 // Parse input
 $input = json_decode(file_get_contents('php://input'), true);
-$status = $input['status'] ?? 'online';
-$activeUsers = $input['active_users'] ?? [];
-$systemInfo = $input['system_info'] ?? null; // CPU, RAM, disk usage
+if (!is_array($input)) {
+    http_response_code(400);
+    echo json_encode(['error' => 'Invalid JSON body']);
+    exit;
+}
 
-// Update heartbeat
 $pcService = new PCService();
-$pcService->updateHeartbeat($pc['id']);
+$result = $pcService->processHeartbeatDelivery($pc, $input);
 
-// Update status if provided
-if (in_array($status, ['online', 'idle', 'locked'])) {
-    $pcService->updatePCStatus($pc['id'], $status);
+if (!($result['success'] ?? false)) {
+    $pcService->emitProtocolDebugEvent((int) ($pc['id'] ?? 0), 'heartbeat_rejected', 'warn', [
+        'pc_id' => (int) ($pc['id'] ?? 0),
+        'error' => (string) ($result['error'] ?? 'unknown'),
+    ]);
+    http_response_code(400);
 }
-
-// Store system info if provided
-if ($systemInfo) {
-    $config = json_decode($pc['config'] ?? '{}', true) ?: [];
-    $config['last_system_info'] = $systemInfo;
-    $config['last_heartbeat_data'] = $input;
-    $db = \XPLabs\Lib\Database::getInstance();
-    $db->update('lab_pcs', ['config' => json_encode($config)], 'id = ?', [$pc['id']]);
-}
-
-// Get pending commands
-$pendingCommands = $pcService->getPendingCommands($pc['id']);
-
-// If there's an active session, include session info
-$activeSession = $pcService->getActiveSession($pc['id']);
-
-echo json_encode([
-    'success' => true,
-    'pc_id' => $pc['id'],
-    'hostname' => $pc['hostname'],
-    'commands' => array_map(function ($cmd) {
-        return [
-            'id' => $cmd['id'],
-            'type' => $cmd['command_type'],
-            'params' => $cmd['params'] ? json_decode($cmd['params'], true) : null,
-            'issued_at' => $cmd['created_at'],
-        ];
-    }, $pendingCommands),
-    'active_session' => $activeSession ? [
-        'session_id' => $activeSession['id'],
-        'user_id' => $activeSession['user_id'],
-        'user_name' => trim($activeSession['first_name'] . ' ' . $activeSession['last_name']),
-        'lrn' => $activeSession['lrn'],
-        'checkin_time' => $activeSession['checkin_time'],
-    ] : null,
-    'server_time' => date('Y-m-d H:i:s'),
-]);
+echo json_encode($result);

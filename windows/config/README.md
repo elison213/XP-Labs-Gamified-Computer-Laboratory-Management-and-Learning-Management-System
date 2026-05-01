@@ -13,6 +13,8 @@ This folder configures a **local-only** Windows Server instance to host XPLabs o
 - `Integrate-XplabsDatabase.ps1` — creates/imports the `xplabs` database (dump import, or migration + seed).
 - `Configure-ClientMachine.ps1` — configures client DNS/network and validates reachability to `lab.local.xplabs.com`.
 - `Apply-LabStabilityUpdate.ps1` — single-script updater for this stability/security release (runs migrations, verifies schema, refreshes services/task, prints smoke checks).
+- `Deploy-ClientPowerShellApp.ps1` — one-script client deployment (optional network setup + agent install + agent config + task start).
+- `Discover-LabPCs.ps1` — discovers hosts from DHCP/ARP on the server and syncs discovered PCs to XPLabs as unassigned.
 
 ## What this does (high-level)
 1. Sets the server’s **static IP** (prompted).
@@ -91,6 +93,31 @@ If you need a static client IP:
 .\Configure-ClientMachine.ps1 -ServerDnsName "lab.local.xplabs.com" -ServerIp "192.168.1.10" -DnsServerIp "192.168.1.10" -SetStaticClientIp -ClientIp "192.168.1.20" -PrefixLength 24 -DefaultGateway "192.168.1.1"
 ```
 
+## One-script client app deployment
+Run on each client (elevated PowerShell):
+
+```powershell
+.\Deploy-ClientPowerShellApp.ps1 -ProjectPath "C:\xampp\htdocs\xplabs" -ServerBaseUrl "http://local.xplabs.com/xplabs" -FloorId 1 -StationId 1 -StartAgentNow
+```
+
+To include optional UI apps during deployment:
+- `-LockscreenExePath "<path_to_XPLabs.LockScreen.exe>"`
+- `-WidgetExePath "<path_to_XPLabs.Widget.exe>"`
+- Deployment sequencing is hardened: UI EXEs are copied first, then `Install-Agent.ps1` runs once to register/update tasks.
+- If `-SkipInstallAgent` is used, EXEs can be copied but task registration is not refreshed.
+
+If you want discovery-first flow, omit floor/station (recommended):
+
+```powershell
+.\Deploy-ClientPowerShellApp.ps1 -ProjectPath "C:\xampp\htdocs\xplabs" -ServerBaseUrl "http://local.xplabs.com/xplabs" -StartAgentNow
+```
+
+If you also want it to configure DNS/network in the same run:
+
+```powershell
+.\Deploy-ClientPowerShellApp.ps1 -ProjectPath "C:\xampp\htdocs\xplabs" -ServerBaseUrl "http://local.xplabs.com/xplabs" -FloorId 1 -StationId 1 -ConfigureNetwork -ServerDnsName "local.xplabs.com" -ServerIp "192.168.100.22" -DnsServerIp "192.168.100.22" -StartAgentNow
+```
+
 ## Config-file mode
 1. Copy `config.example.json` to `config.json`
 2. Edit values
@@ -157,6 +184,19 @@ On the server:
 ### PC agent (when ready)
 - Configure lab PCs using `windows/agent/agent.config.json` with `server_base_url` set to `http://lab.xplabs.com/xplabs`.
 
+## Discovery-first assignment workflow
+1. Deploy clients with no floor/station in config.
+2. On server, discover hosts:
+   ```powershell
+   .\Discover-LabPCs.ps1 -PreviewOnly
+   ```
+3. Sync discovered hosts with authenticated admin session (supply CSRF + session cookie):
+   ```powershell
+   .\Discover-LabPCs.ps1 -CsrfToken "<csrf_token>" -SessionCookie "XPLABS_SESSION=<session_cookie>"
+   ```
+4. In website, open `dashboard_lab_pcs.php` and assign unassigned PCs to a floor/station.
+5. Assigned PCs appear in seatplan/monitoring context for that floor.
+
 ## Post-run validation commands
 Run these after setup to verify critical dependencies:
 
@@ -174,6 +214,55 @@ $k = Get-Content "$env:ProgramData\XPLabsAgent\machine_key.txt" -ErrorAction Sto
 Invoke-RestMethod -Method GET -Uri "http://local.xplabs.com/xplabs/api/pc/config" -Headers @{ "X-Machine-Key" = $k }
 Invoke-RestMethod -Method GET -Uri "http://local.xplabs.com/xplabs/api/pc/commands" -Headers @{ "X-Machine-Key" = $k }
 ```
+
+## Client UI runtime checks
+- Agent loop is background-only and does not create a desktop window.
+- Lockscreen admin login screen is shown by `XPLabsLockScreen` when `state.json.locked=true`.
+- Widget behavior:
+  - clicking `X` hides to tray,
+  - tray menu `Exit` triggers local lock request and returns lockscreen.
+- Quick checks:
+  - `Get-ScheduledTask -TaskName XPLabsLockScreen,XPLabsWidget -ErrorAction SilentlyContinue`
+  - `Get-Content "$env:ProgramData\XPLabsAgent\logs\agent.log" -Tail 80`
+
+## Heartbeat protocol validation (post-deploy)
+- Confirm migration `049_add_heartbeat_delivery_protocol.sql` is applied.
+- Confirm migration `050_add_pc_protocol_debug_events.sql` is applied.
+- Validate heartbeat response includes:
+  - `ack_id`
+  - `command_cursor`
+  - `commands`
+  - `retry_after_sec`
+- Validate command poll fallback endpoint:
+  - `GET /api/pc/commands?after_cursor=<cursor>`
+  - response `next_cursor` should monotonically increase
+- Validate diagnostics endpoint (admin/teacher session required):
+  - `GET /api/pc/debug-events?pc_id=<id>&limit=100`
+
+## Protocol rollout flag (client)
+- In `C:\ProgramData\XPLabsAgent\agent.config.json`:
+  - `heartbeat_protocol_version: "v2"` (recommended)
+  - `heartbeat_protocol_version: "v1"` (fallback compatibility mode)
+
+## Agent debug mode
+- Config keys:
+  - `debug_enabled`
+  - `debug_level` (`normal|verbose|trace`)
+  - `debug_retention_days`
+- Debug log path:
+  - `C:\ProgramData\XPLabsAgent\logs\agent-debug.log`
+
+### Recovery diagnostics checklist
+- If check-ins are flaky:
+  - inspect `agent.log` for `checkin_state=degraded|backoff|offline_buffering|recovered`
+  - inspect `agent-debug.log` for correlated `heartbeat_id` and `ack_id`
+  - query `/api/pc/debug-events` for server-side dedup/cursor traces
+  - inspect spool directory: `C:\ProgramData\XPLabsAgent\heartbeat-spool`
+  - verify machine API reachability using machine key
+- If lockscreen does not appear after startup:
+  - verify `XPLabsLockScreen` task exists and can start
+  - verify lockscreen EXE path exists under Program Files
+  - verify `state.json` still has `locked=true`
 
 ## Regression checklist before rollout
 - API auth: verify session-only endpoints reject unauthenticated calls.

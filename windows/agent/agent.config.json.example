@@ -6,6 +6,10 @@
   "command_poll_interval_seconds": 5,
   "validate_interval_seconds": 10,
   "validate_grace_minutes": 5,
-  "log_level": "info"
+  "log_level": "info",
+  "heartbeat_protocol_version": "v2",
+  "debug_enabled": false,
+  "debug_level": "normal",
+  "debug_retention_days": 7
 }
 
