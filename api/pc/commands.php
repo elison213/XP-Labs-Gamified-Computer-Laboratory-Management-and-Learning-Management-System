@@ -121,6 +121,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $pcService->failCommand($commandId, $result ?? 'Execution failed');
     }
+
+    $pcRow = $db->fetch('SELECT last_command_cursor FROM lab_pcs WHERE id = ?', [$pc['id']]);
+    $serverCursor = (int) ($pcRow['last_command_cursor'] ?? 0);
+    if ($commandId > $serverCursor) {
+        $db->update('lab_pcs', ['last_command_cursor' => $commandId], 'id = ?', [$pc['id']]);
+    }
+
     $pcService->emitProtocolDebugEvent((int) $pc['id'], 'command_ack_processed', 'info', [
         'pc_id' => (int) $pc['id'],
         'command_id' => $commandId,

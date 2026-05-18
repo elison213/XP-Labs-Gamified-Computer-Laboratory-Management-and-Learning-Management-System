@@ -146,7 +146,7 @@ function Drain-QueuedHeartbeats {
         command_cursor = [string]($res.command_cursor)
       } -MinLevel 'verbose'
       if ($res -and ($res.PSObject.Properties.Name -contains 'commands')) {
-        foreach ($c in @($res.commands)) { Process-Command -MachineKey $MachineKey -Command $c }
+        Add-CommandsToTickBatch -Commands $res.commands
       }
       Remove-XplabsQueuedHeartbeat -Path $item.FullName
     } catch {
@@ -225,13 +225,108 @@ function Validate-Access {
   }
 }
 
+function Set-CommandCursorIfHigher {
+  param([int] $CommandId)
+  if ($CommandId -le 0) { return }
+  $state = Get-AgentState
+  $cur = 0
+  try {
+    if ($null -ne $state.last_command_cursor) { $cur = [int64]$state.last_command_cursor }
+  } catch {}
+  if ($CommandId -gt $cur) {
+    $state.last_command_cursor = $CommandId
+    Set-AgentState -State $state
+  }
+}
+
+function Send-CommandAck {
+  param(
+    [Parameter(Mandatory)] [string] $MachineKey,
+    [Parameter(Mandatory)] [int] $CommandId,
+    [Parameter(Mandatory)] [string] $Status,
+    [string] $ResultText = ''
+  )
+  if ($CommandId -le 0) { return $false }
+  try {
+    Invoke-XplabsApi -Method 'POST' -Path '/api/pc/commands' -Body @{
+      command_id = $CommandId
+      status     = $Status
+      result     = $ResultText
+    } -MachineKey $MachineKey | Out-Null
+    Set-CommandCursorIfHigher -CommandId $CommandId
+    return $true
+  } catch {
+    Write-XplabsLog -Level warn -Message "Ack failed for command_id=${CommandId}: $($_.Exception.Message)"
+    return $false
+  }
+}
+
+function Start-RemoteLockscreenUi {
+  try {
+    Start-ScheduledTask -TaskName 'XPLabsLockScreen' -ErrorAction Stop | Out-Null
+    return $true
+  } catch {
+    Write-XplabsLog -Level warn -Message "Lockscreen task start failed: $($_.Exception.Message)"
+    return $false
+  }
+}
+
+function Stop-RemoteLockscreenUi {
+  Get-Process -Name 'XPLabs.LockScreen' -ErrorAction SilentlyContinue | ForEach-Object {
+    Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
+  }
+}
+
+function Start-RemoteWidgetUi {
+  try {
+    Start-ScheduledTask -TaskName 'XPLabsWidget' -ErrorAction Stop | Out-Null
+    return $true
+  } catch {
+    Write-XplabsLog -Level warn -Message "Widget task start failed: $($_.Exception.Message)"
+    return $false
+  }
+}
+
+$script:CommandsThisTick = [System.Collections.ArrayList]::new()
+$script:CommandIdsThisTick = @{}
+$script:InFlightCommandIds = @{}
+
+function Add-CommandsToTickBatch {
+  param($Commands)
+  if ($null -eq $Commands) { return }
+  foreach ($c in @($Commands)) {
+    if ($null -eq $c) { continue }
+    $id = 0
+    try { $id = [int]$c.id } catch { continue }
+    if ($id -le 0) { continue }
+    if ($script:CommandIdsThisTick.ContainsKey($id)) { continue }
+    $script:CommandIdsThisTick[$id] = $true
+    [void]$script:CommandsThisTick.Add($c)
+  }
+}
+
+function Invoke-CommandsThisTick {
+  param([Parameter(Mandatory)] [string] $MachineKey)
+  if ($script:CommandsThisTick.Count -le 0) { return }
+  foreach ($c in @($script:CommandsThisTick.ToArray())) {
+    Process-Command -MachineKey $MachineKey -Command $c
+  }
+  $script:CommandsThisTick.Clear()
+  $script:CommandIdsThisTick = @{}
+}
+
 function Process-Command {
   param(
     [Parameter(Mandatory)] [string] $MachineKey,
     [Parameter(Mandatory)] $Command
   )
-  $type = $Command.type
-  $cmdId = [int]$Command.id
+  $type = [string]$Command.type
+  $cmdId = 0
+  try { $cmdId = [int]$Command.id } catch {}
+  if ($cmdId -le 0) { return }
+
+  if ($script:InFlightCommandIds.ContainsKey($cmdId)) { return }
+  $script:InFlightCommandIds[$cmdId] = $true
 
   $state = Get-AgentState
   $resultText = $null
@@ -242,6 +337,8 @@ function Process-Command {
       'lock' {
         $state.locked = $true
         Invoke-XplabsAccessCleanup
+        Set-AgentState -State $state
+        Start-RemoteLockscreenUi | Out-Null
         $resultText = 'Locked by command'
       }
       'unlock' {
@@ -249,22 +346,38 @@ function Process-Command {
         if ($params -and $params.lrn) { $state.last_lrn = [string]$params.lrn }
         $state.locked = $false
         $state.last_unlock_at = (Get-Date).ToString('s')
+        Set-AgentState -State $state
+        Stop-RemoteLockscreenUi
         $userKey = ''
         if ($null -ne $state.last_lrn) { $userKey = [string]$state.last_lrn }
         Invoke-XplabsAccessApply -MachineKey $MachineKey -Role 'student' -Username $userKey -LabName ''
+        Start-RemoteWidgetUi | Out-Null
         $resultText = "Unlocked for LRN=$($state.last_lrn)"
       }
       'message' {
-        $msg = $Command.params.message
+        $msg = ''
+        if ($null -ne $Command.params -and ($Command.params.PSObject.Properties.Name -contains 'message')) {
+          $msg = [string]$Command.params.message
+        }
+        if ([string]::IsNullOrWhiteSpace($msg)) { $msg = '(no text)' }
         $resultText = "Message: $msg"
+        Start-RemoteWidgetUi | Out-Null
       }
       'restart' {
         $resultText = 'Restarting'
+        if (Send-CommandAck -MachineKey $MachineKey -CommandId $cmdId -Status 'executed' -ResultText $resultText) {
+          $script:InFlightCommandIds.Remove($cmdId) | Out-Null
+        }
         Restart-Computer -Force
+        return
       }
       'shutdown' {
         $resultText = 'Shutting down'
+        if (Send-CommandAck -MachineKey $MachineKey -CommandId $cmdId -Status 'executed' -ResultText $resultText) {
+          $script:InFlightCommandIds.Remove($cmdId) | Out-Null
+        }
         Stop-Computer -Force
+        return
       }
       default {
         $status = 'failed'
@@ -278,27 +391,15 @@ function Process-Command {
     Set-AgentState -State $state
   }
 
-  try {
-    Invoke-XplabsApi -Method 'POST' -Path '/api/pc/commands' -Body @{
-      command_id = $cmdId
-      status     = $status
-      result     = $resultText
-    } -MachineKey $MachineKey | Out-Null
+  if (Send-CommandAck -MachineKey $MachineKey -CommandId $cmdId -Status $status -ResultText ([string]$resultText)) {
     Write-XplabsDebugEvent -EventType 'command_ack' -Severity 'info' -Data @{
       command_id = $cmdId
-      command_type = [string]$type
-      status = [string]$status
-    } -MinLevel 'verbose'
-  } catch {
-    Write-XplabsLog -Level warn -Message "Ack failed for command_id=${cmdId}: $($_.Exception.Message)"
-    Write-XplabsDebugEvent -EventType 'command_ack' -Severity 'warn' -Data @{
-      command_id = $cmdId
-      command_type = [string]$type
-      status = [string]$status
-      error = $_.Exception.Message
+      command_type = $type
+      status = $status
     } -MinLevel 'verbose'
   }
 
+  $script:InFlightCommandIds.Remove($cmdId) | Out-Null
   Write-XplabsLog -Level info -Message "Command processed id=$cmdId type=$type status=$status result=$resultText"
 }
 
@@ -368,12 +469,7 @@ function Poll-Commands {
     next_cursor = [string]($res.next_cursor)
     count = [string](@($res.commands).Count)
   } -MinLevel 'trace'
-  if ($res -and ($res.PSObject.Properties.Name -contains 'next_cursor')) {
-    try {
-      $state.last_command_cursor = [int64]$res.next_cursor
-      Set-AgentState -State $state
-    } catch {}
-  }
+  # Do not advance cursor here — only after successful ack in Send-CommandAck.
   if ($res -and ($res.PSObject.Properties.Name -contains 'commands') -and $null -ne $res.commands) { return @($res.commands) }
   return @()
 }
@@ -459,6 +555,8 @@ $consecutiveHeartbeatFailures = 0
 
 while ($true) {
   $now = Get-Date
+  $script:CommandsThisTick = [System.Collections.ArrayList]::new()
+  $script:CommandIdsThisTick = @{}
 
   if (($now - $lastHb).TotalSeconds -ge $hbEvery) {
     $payload = $null
@@ -472,7 +570,7 @@ while ($true) {
       } -MinLevel 'normal'
       $hb = Send-HeartbeatPayload -MachineKey $machineKey -Body $payload
       if ($hb -and ($hb.PSObject.Properties.Name -contains 'commands')) {
-        foreach ($c in @($hb.commands)) { Process-Command -MachineKey $machineKey -Command $c }
+        Add-CommandsToTickBatch -Commands $hb.commands
       }
       $state = Get-AgentState
       if ($hb -and ($hb.PSObject.Properties.Name -contains 'server_time')) {
@@ -481,9 +579,7 @@ while ($true) {
       if ($hb -and ($hb.PSObject.Properties.Name -contains 'ack_id')) {
         $state.last_ack_id = [string]$hb.ack_id
       }
-      if ($hb -and ($hb.PSObject.Properties.Name -contains 'command_cursor')) {
-        try { $state.last_command_cursor = [int64]$hb.command_cursor } catch {}
-      }
+      # Do not advance local cursor from heartbeat delivery — only after command ack.
       if ($hb -and ($hb.PSObject.Properties.Name -contains 'active_session') -and $hb.active_session -and ($hb.active_session.PSObject.Properties.Name -contains 'lrn')) {
         $state.last_lrn = [string] $hb.active_session.lrn
       }
@@ -527,11 +623,17 @@ while ($true) {
   if (($now - $lastPoll).TotalSeconds -ge $pollEvery) {
     try {
       $cmds = Poll-Commands -MachineKey $machineKey
-      foreach ($c in $cmds) { Process-Command -MachineKey $machineKey -Command $c }
+      Add-CommandsToTickBatch -Commands $cmds
     } catch {
       Write-XplabsLog -Level warn -Message "Command poll failed: $($_.Exception.Message)"
     }
     $lastPoll = $now
+  }
+
+  try {
+    Invoke-CommandsThisTick -MachineKey $machineKey
+  } catch {
+    Write-XplabsLog -Level warn -Message "Command batch failed: $($_.Exception.Message)"
   }
 
   Process-OverrideUnlockRequest -MachineKey $machineKey

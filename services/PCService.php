@@ -450,9 +450,9 @@ class PCService
             'command_cursor' => $nextCursor,
             'response_json' => $responseJson ?: '{}',
         ]);
+        // Advance last_command_cursor only when the agent acks (POST /api/pc/commands.php), not on delivery.
         $this->db->update('lab_pcs', [
             'last_heartbeat_ack_id' => $ackId,
-            'last_command_cursor' => $nextCursor,
         ], 'id = ?', [$pcId]);
         $responsePayload['ack_id'] = $ackId;
 
@@ -1208,14 +1208,17 @@ class PCService
 
     public function getPendingCommandsAfterCursor(int $pcId, int $afterCursor = 0): array
     {
+        // Return all pending commands. Filtering id > agent cursor stranded commands after queue reset.
+        unset($afterCursor);
+
         return $this->db->fetchAll(
             "SELECT * FROM remote_commands
              WHERE pc_id = ?
-               AND id > ?
                AND status = 'pending'
                AND (expires_at IS NULL OR expires_at > NOW())
-             ORDER BY id ASC",
-            [$pcId, $afterCursor]
+             ORDER BY id ASC
+             LIMIT 50",
+            [$pcId]
         );
     }
 
