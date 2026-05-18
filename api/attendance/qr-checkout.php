@@ -6,14 +6,16 @@
 
 header('Content-Type: application/json');
 
-require_once __DIR__ . '/../../lib/Auth.php';
 require_once __DIR__ . '/../../lib/Database.php';
 require_once __DIR__ . '/../../services/AttendanceService.php';
 require_once __DIR__ . '/../../services/UserService.php';
+require_once __DIR__ . '/../../services/KioskDeviceService.php';
+require_once __DIR__ . '/../../src/Core/Request.php';
 
-use XPLabs\Lib\Auth;
 use XPLabs\Services\AttendanceService;
 use XPLabs\Services\UserService;
+use XPLabs\Services\KioskDeviceService;
+use XPLabs\Core\Request;
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -24,6 +26,24 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $input = json_decode(file_get_contents('php://input'), true);
 $lrn = trim($input['lrn'] ?? '');
 $sessionId = (int) ($input['session_id'] ?? 0);
+
+$kioskDeviceId = null;
+$kioskSvc = new KioskDeviceService();
+$kioskToken = trim((string) ($_SERVER['HTTP_X_KIOSK_TOKEN'] ?? ''));
+if ($kioskToken === '') {
+    $authHdr = (string) ($_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['Authorization'] ?? '');
+    if (preg_match('/Bearer\s+(.+)/i', $authHdr, $m)) {
+        $kioskToken = trim($m[1]);
+    }
+}
+if ($kioskToken !== '' && $kioskSvc->tableExists()) {
+    $kd = $kioskSvc->verifyApiToken($kioskToken);
+    if ($kd) {
+        $ip = Request::fromGlobals()->ip();
+        $kioskSvc->touchDevice((int) $kd['id'], $ip);
+        $kioskDeviceId = (int) $kd['id'];
+    }
+}
 
 if (empty($lrn)) {
     http_response_code(400);
@@ -68,11 +88,15 @@ if (!$sessionId) {
 $result = $attendanceService->checkOut($sessionId, $user['id']);
 
 if ($result['success']) {
-    echo json_encode([
+    $out = [
         'success' => true,
         'message' => "Goodbye, {$user['first_name']}!",
         'duration_minutes' => $result['duration_minutes'],
-    ]);
+    ];
+    if ($kioskDeviceId) {
+        $out['kiosk_device_id'] = $kioskDeviceId;
+    }
+    echo json_encode($out);
 } else {
     http_response_code(400);
     echo json_encode(['error' => $result['message']]);

@@ -33,6 +33,26 @@ class IncidentService {
             $where[] = 'i.lab_id = ?';
             $params[] = $filters['lab_id'];
         }
+        if (!empty($filters['assigned_to'])) {
+            $where[] = 'i.assigned_to = ?';
+            $params[] = (int) $filters['assigned_to'];
+        }
+        if (!empty($filters['date_from'])) {
+            $where[] = 'DATE(i.created_at) >= ?';
+            $params[] = $filters['date_from'];
+        }
+        if (!empty($filters['date_to'])) {
+            $where[] = 'DATE(i.created_at) <= ?';
+            $params[] = $filters['date_to'];
+        }
+        if (!empty($filters['search'])) {
+            $term = '%' . trim((string) $filters['search']) . '%';
+            $where[] = '(i.title LIKE ? OR i.description LIKE ? OR i.type LIKE ?
+                OR u1.first_name LIKE ? OR u1.last_name LIKE ?
+                OR u2.first_name LIKE ? OR u2.last_name LIKE ?
+                OR l.name LIKE ? OR ls.station_code LIKE ?)';
+            array_push($params, $term, $term, $term, $term, $term, $term, $term, $term, $term);
+        }
         if (!empty($filters['limit'])) {
             $limit = (int) $filters['limit'];
         } else {
@@ -45,12 +65,14 @@ class IncidentService {
             "SELECT i.*, 
                     u1.first_name as reporter_first, u1.last_name as reporter_last,
                     u2.first_name as assignee_first, u2.last_name as assignee_last,
-                    l.name as lab_name, lf.name as floor_name
+                    l.name as lab_name, lf.name as floor_name,
+                    ls.station_code as station_code
              FROM incidents i
              JOIN users u1 ON i.reported_by = u1.id
              LEFT JOIN users u2 ON i.assigned_to = u2.id
              LEFT JOIN labs l ON i.lab_id = l.id
              LEFT JOIN lab_floors lf ON i.floor_id = lf.id
+             LEFT JOIN lab_stations ls ON i.station_id = ls.id
              WHERE $whereClause
              ORDER BY i.created_at DESC
              LIMIT $limit",
@@ -67,12 +89,14 @@ class IncidentService {
             "SELECT i.*, 
                     u1.first_name as reporter_first, u1.last_name as reporter_last,
                     u2.first_name as assignee_first, u2.last_name as assignee_last,
-                    l.name as lab_name, lf.name as floor_name
+                    l.name as lab_name, lf.name as floor_name,
+                    ls.station_code as station_code
              FROM incidents i
              JOIN users u1 ON i.reported_by = u1.id
              LEFT JOIN users u2 ON i.assigned_to = u2.id
              LEFT JOIN labs l ON i.lab_id = l.id
              LEFT JOIN lab_floors lf ON i.floor_id = lf.id
+             LEFT JOIN lab_stations ls ON i.station_id = ls.id
              WHERE i.id = ?",
             [$id]
         );
@@ -91,6 +115,7 @@ class IncidentService {
             'location' => $data['location'] ?? null,
             'lab_id' => !empty($data['lab_id']) ? (int)$data['lab_id'] : null,
             'floor_id' => !empty($data['floor_id']) ? (int)$data['floor_id'] : null,
+            'station_id' => !empty($data['station_id']) ? (int)$data['station_id'] : null,
             'reported_by' => (int)$reportedBy,
         ];
 
@@ -112,9 +137,15 @@ class IncidentService {
             return false;
         }
 
+        foreach (['lab_id', 'floor_id', 'station_id', 'assigned_to'] as $nk) {
+            if (array_key_exists($nk, $data) && $data[$nk] === '') {
+                $data[$nk] = null;
+            }
+        }
+
         $updates = [];
-        foreach (['status', 'severity', 'assigned_to', 'resolution_notes', 'lab_id', 'floor_id'] as $field) {
-            if (isset($data[$field])) {
+        foreach (['status', 'severity', 'assigned_to', 'resolution_notes', 'lab_id', 'floor_id', 'station_id'] as $field) {
+            if (array_key_exists($field, $data)) {
                 $oldValue = $incident[$field];
                 $newValue = $data[$field];
                 if ($oldValue != $newValue) {
@@ -167,7 +198,6 @@ class IncidentService {
         return $this->db->fetch(
             "SELECT 
                     COUNT(*) as total,
-                    status, severity,
                     SUM(CASE WHEN status = 'reported' THEN 1 ELSE 0 END) as reported_count,
                     SUM(CASE WHEN status = 'investigating' THEN 1 ELSE 0 END) as investigating_count,
                     SUM(CASE WHEN status = 'resolved' THEN 1 ELSE 0 END) as resolved_count,
@@ -175,8 +205,7 @@ class IncidentService {
                     SUM(CASE WHEN severity = 'critical' THEN 1 ELSE 0 END) as critical_count,
                     SUM(CASE WHEN severity = 'high' THEN 1 ELSE 0 END) as high_count
              FROM incidents
-             WHERE $where
-             GROUP BY status, severity",
+             WHERE $where",
             $params
         );
     }

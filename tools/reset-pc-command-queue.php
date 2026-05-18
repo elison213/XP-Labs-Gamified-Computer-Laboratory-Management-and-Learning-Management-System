@@ -1,6 +1,6 @@
 <?php
 /**
- * Fail pending commands and reset server command cursor for one PC.
+ * Fail all pending commands for a PC and reset server command cursor.
  * Usage: php tools/reset-pc-command-queue.php --pc_id=8
  */
 require_once __DIR__ . '/../lib/Database.php';
@@ -33,5 +33,6 @@ $db->query(
 );
 echo "Reset lab_pcs command cursor for pc_id=$pcId" . PHP_EOL;
 echo PHP_EOL;
-echo "On the lab PC (elevated):" . PHP_EOL;
+echo 'On the lab PC (elevated PowerShell), reset the agent cursor too:' . PHP_EOL;
 echo '  powershell -ExecutionPolicy Bypass -File "C:\Program Files\XPLabsAgent\Repair-PcCommandCursor.ps1" -ResetToZero' . PHP_EOL;
+echo 'Then: schtasks /Run /TN XPLabsAgentLoop' . PHP_EOL;

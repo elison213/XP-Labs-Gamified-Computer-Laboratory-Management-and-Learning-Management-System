@@ -21,6 +21,14 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+function Assert-CompatibleClientOs {
+  $os = Get-CimInstance Win32_OperatingSystem
+  $caption = [string]$os.Caption
+  if ($caption -notmatch 'Windows 10|Windows 11|Windows Server 2022|Windows Server 2025') {
+    Write-Warning "This script is designed for Windows 10/11 and recent Windows Server. Detected: $caption"
+  }
+}
+
 function Assert-Admin {
   $id = [Security.Principal.WindowsIdentity]::GetCurrent()
   $p = New-Object Security.Principal.WindowsPrincipal($id)
@@ -44,6 +52,22 @@ function Ensure-ConfigFile([string]$ConfigPath, [string]$SourceExamplePath) {
   }
 }
 
+function Copy-UiPayload([string]$InputPath, [string]$TargetDir, [string]$PrimaryExeName) {
+  if (-not (Test-Path $InputPath)) { throw "UI payload path not found: $InputPath" }
+  if (-not (Test-Path $TargetDir)) { New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null }
+
+  $resolved = (Resolve-Path -Path $InputPath).Path
+  if (Test-Path $resolved -PathType Container) {
+    Copy-Item -Path (Join-Path $resolved '*') -Destination $TargetDir -Recurse -Force
+  } else {
+    Copy-Item -Path $resolved -Destination (Join-Path $TargetDir $PrimaryExeName) -Force
+    $srcDir = Split-Path -Parent $resolved
+    if ($srcDir -and (Test-Path (Join-Path $srcDir '*'))) {
+      Copy-Item -Path (Join-Path $srcDir '*') -Destination $TargetDir -Recurse -Force
+    }
+  }
+}
+
 function Update-AgentConfig(
   [string] $ConfigPath,
   [string] $BaseUrl,
@@ -59,6 +83,7 @@ function Update-AgentConfig(
 }
 
 Assert-Admin
+Assert-CompatibleClientOs
 
 $ProjectPath = Resolve-ProjectPath -InputPath $ProjectPath
 if (-not (Test-Path $ProjectPath)) { throw "Project path not found: $ProjectPath" }
@@ -105,19 +130,15 @@ if ($ConfigureNetwork) {
 }
 
 if ($LockscreenExePath -and $LockscreenExePath.Trim().Length -gt 0) {
-  if (-not (Test-Path $LockscreenExePath)) { throw "Lockscreen EXE path not found: $LockscreenExePath" }
-  if (-not (Test-Path $targetLockscreenDir)) { New-Item -ItemType Directory -Path $targetLockscreenDir -Force | Out-Null }
-  Copy-Item -Path $LockscreenExePath -Destination $targetLockscreenExe -Force
-  Write-Host "Copied lockscreen EXE to: $targetLockscreenExe" -ForegroundColor Green
+  Copy-UiPayload -InputPath $LockscreenExePath -TargetDir $targetLockscreenDir -PrimaryExeName 'XPLabs.LockScreen.exe'
+  Write-Host "Copied lockscreen payload to: $targetLockscreenDir" -ForegroundColor Green
 } else {
   Write-Host "Lockscreen EXE not provided. Pass -LockscreenExePath to enable lock UI deployment." -ForegroundColor Yellow
 }
 
 if ($WidgetExePath -and $WidgetExePath.Trim().Length -gt 0) {
-  if (-not (Test-Path $WidgetExePath)) { throw "Widget EXE path not found: $WidgetExePath" }
-  if (-not (Test-Path $targetWidgetDir)) { New-Item -ItemType Directory -Path $targetWidgetDir -Force | Out-Null }
-  Copy-Item -Path $WidgetExePath -Destination $targetWidgetExe -Force
-  Write-Host "Copied widget EXE to: $targetWidgetExe" -ForegroundColor Green
+  Copy-UiPayload -InputPath $WidgetExePath -TargetDir $targetWidgetDir -PrimaryExeName 'XPLabs.Widget.exe'
+  Write-Host "Copied widget payload to: $targetWidgetDir" -ForegroundColor Green
 } else {
   Write-Host "Widget EXE not provided. Pass -WidgetExePath to enable desktop agent widget deployment." -ForegroundColor Yellow
 }
@@ -125,7 +146,9 @@ if ($WidgetExePath -and $WidgetExePath.Trim().Length -gt 0) {
 if (-not $SkipInstallAgent) {
   if (-not (Test-Path $installScript)) { throw "Missing agent install script: $installScript" }
   Write-Host "Installing agent app and scheduled tasks..." -ForegroundColor Cyan
-  & $installScript -SourceDir $WindowsSourceDir
+  $installArgs = @{ SourceDir = $WindowsSourceDir }
+  if (-not $StartAgentNow) { $installArgs.SkipStart = $true }
+  & $installScript @installArgs
 } else {
   if ((Test-Path $targetLockscreenExe) -or (Test-Path $targetWidgetExe)) {
     Write-Warning "SkipInstallAgent was set. UI binaries were copied but scheduled tasks were not refreshed."

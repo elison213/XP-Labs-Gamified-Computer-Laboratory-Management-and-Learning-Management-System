@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -13,11 +15,19 @@ namespace XPLabs.Widget
     public partial class MainWindow : Window
     {
         private readonly DispatcherTimer _refreshTimer = new DispatcherTimer();
+        private readonly DispatcherTimer _messagesTimer = new DispatcherTimer();
+        private readonly DispatcherTimer _activityTimer = new DispatcherTimer();
+        private readonly DispatcherTimer _lockEnforceTimer = new DispatcherTimer();
         private readonly string _dataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "XPLabsAgent");
         private readonly Forms.NotifyIcon _trayIcon = new Forms.NotifyIcon();
+        private readonly DesktopActivitySampler _activitySampler = new DesktopActivitySampler();
+        private readonly List<Dictionary<string, object>> _activityBuffer = new List<Dictionary<string, object>>();
         private bool _logsVisible;
         private bool _isAdmin;
         private bool _allowExit;
+        private int _activeThreadId;
+        private string _activeLrn = "";
+        private int _lastPendingCount;
 
         public MainWindow()
         {
@@ -31,10 +41,16 @@ namespace XPLabs.Widget
         private string ConfigPath => Path.Combine(_dataDir, "agent.config.json");
         private string KeyPath => Path.Combine(_dataDir, "machine_key.txt");
         private string LockRequestPath => Path.Combine(_dataDir, "lock_request.json");
+        private string ShowLockscreenDemandPath => Path.Combine(_dataDir, "show_lockscreen_demand.json");
+        private string PendingMessagesPath => Path.Combine(_dataDir, "pending_messages.json");
+        private static readonly string LockscreenExePath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+            "XPLabsAgent", "LockScreen", "XPLabs.LockScreen.exe");
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             PositionBottomRight();
+            Topmost = true;
             _isAdmin = IsCurrentUserAdmin();
             ConfigureAccess();
             ConfigureTrayIcon();
@@ -43,7 +59,20 @@ namespace XPLabs.Widget
             _refreshTimer.Tick += (_, __) => RefreshWidget();
             _refreshTimer.Start();
 
+            _messagesTimer.Interval = TimeSpan.FromSeconds(5);
+            _messagesTimer.Tick += (_, __) => RefreshMessages(silent: true);
+            _messagesTimer.Start();
+
+            _activityTimer.Interval = TimeSpan.FromSeconds(15);
+            _activityTimer.Tick += (_, __) => SampleAndFlushActivity();
+            _activityTimer.Start();
+
+            _lockEnforceTimer.Interval = TimeSpan.FromSeconds(2);
+            _lockEnforceTimer.Tick += (_, __) => EnforceLockscreenIfNeeded();
+            _lockEnforceTimer.Start();
+
             RefreshWidget();
+            RefreshMessages(silent: false);
         }
 
         private void MainWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
@@ -166,10 +195,320 @@ namespace XPLabs.Widget
 
             _trayIcon.Text = $"XPLabs Agent Widget - {lockedState}";
 
+            var stateLrn = "";
+            try
+            {
+                if (File.Exists(StatePath))
+                {
+                    stateLrn = JsonTiny.TryGetString(File.ReadAllText(StatePath, Encoding.UTF8), "last_lrn", "");
+                }
+            }
+            catch { /* ignore */ }
+            if (!string.IsNullOrWhiteSpace(stateLrn))
+            {
+                _activeLrn = stateLrn;
+            }
+
             if (_logsVisible && _isAdmin)
             {
                 LoadLogs();
             }
+
+            EnforceLockscreenIfNeeded();
+        }
+
+        private void EnforceLockscreenIfNeeded()
+        {
+            try
+            {
+                var demand = File.Exists(ShowLockscreenDemandPath);
+                var locked = false;
+                if (File.Exists(StatePath))
+                {
+                    locked = JsonTiny.TryGetBool(File.ReadAllText(StatePath, Encoding.UTF8), "locked", defaultValue: true);
+                }
+
+                if (!locked && !demand)
+                {
+                    return;
+                }
+
+                if (IsLockscreenVisibleInUserSession())
+                {
+                    if (demand)
+                    {
+                        try { File.Delete(ShowLockscreenDemandPath); } catch { }
+                    }
+                    return;
+                }
+
+                if (!File.Exists(LockscreenExePath))
+                {
+                    return;
+                }
+
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = LockscreenExePath,
+                    UseShellExecute = true,
+                    WindowStyle = ProcessWindowStyle.Maximized
+                });
+            }
+            catch
+            {
+                // Best-effort; agent loop also retries from SYSTEM.
+            }
+        }
+
+        private static bool IsLockscreenVisibleInUserSession()
+        {
+            try
+            {
+                return Process.GetProcessesByName("XPLabs.LockScreen")
+                    .Any(p => p.SessionId > 0);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private void RefreshMessages(bool silent)
+        {
+            var baseUrl = ReadConfigValue("server_base_url");
+            var machineKey = ReadFirstLine(KeyPath);
+            var merged = new List<InboxMessage>();
+
+            merged.AddRange(MessagesApiClient.LoadPendingFromFile(PendingMessagesPath));
+
+            if (!string.IsNullOrWhiteSpace(baseUrl) && !string.IsNullOrWhiteSpace(machineKey))
+            {
+                try
+                {
+                    var json = ApiGet(baseUrl.TrimEnd('/') + "/api/pc/messages.php", machineKey);
+                    var apiLrn = MessagesApiClient.TryGetActiveLrn(json);
+                    if (!string.IsNullOrWhiteSpace(apiLrn))
+                    {
+                        _activeLrn = apiLrn;
+                    }
+                    var threadId = MessagesApiClient.TryGetLatestOpenThreadId(json);
+                    if (threadId > 0)
+                    {
+                        _activeThreadId = threadId;
+                    }
+                    merged.AddRange(MessagesApiClient.ParseInbox(json));
+                }
+                catch (Exception ex)
+                {
+                    if (!silent)
+                    {
+                        MessagesStatusText.Text = "Messages API: " + ex.Message;
+                    }
+                }
+            }
+
+            var distinctList = merged
+                .Where(m => !string.IsNullOrWhiteSpace(m.Body))
+                .GroupBy(m => m.ThreadId + "|" + m.Body + "|" + m.CreatedAt)
+                .Select(g => g.First())
+                .OrderBy(m => m.CreatedAt)
+                .ToList();
+            if (distinctList.Count > 40)
+            {
+                distinctList = distinctList.Skip(distinctList.Count - 40).ToList();
+            }
+
+            MessagesList.Items.Clear();
+            foreach (var m in distinctList)
+            {
+                var who = string.IsNullOrWhiteSpace(m.SenderName) ? m.SenderRole : m.SenderName;
+                var prefix = m.IsPending ? "[NEW] " : "";
+                MessagesList.Items.Add(prefix + who + ": " + m.Body);
+                if (m.ThreadId > 0)
+                {
+                    _activeThreadId = m.ThreadId;
+                }
+            }
+
+            var pendingCount = merged.Count(x => x.IsPending);
+            if (pendingCount > 0)
+            {
+                MessagesApiClient.ClearPendingFile(PendingMessagesPath);
+            }
+            if (pendingCount > _lastPendingCount)
+            {
+                ShowFromTray();
+            }
+            _lastPendingCount = pendingCount;
+
+            if (distinctList.Count == 0)
+            {
+                MessagesStatusText.Text = string.IsNullOrWhiteSpace(baseUrl) ? "Configure server_base_url in agent.config.json" : "No messages yet.";
+            }
+            else
+            {
+                MessagesStatusText.Text = distinctList.Count + " message(s). Thread #" + (_activeThreadId > 0 ? _activeThreadId.ToString() : "?");
+            }
+        }
+
+        private void SampleAndFlushActivity()
+        {
+            var sample = _activitySampler.Sample();
+            if (sample != null)
+            {
+                ActivityText.Text = "Activity: " + (sample.EventType == "idle" ? "idle " + sample.IdleSeconds + "s" : sample.Process + " — " + sample.Title);
+                var lrn = ReadStateLrn();
+                _activityBuffer.Add(new Dictionary<string, object>
+                {
+                    ["event_type"] = sample.EventType,
+                    ["payload"] = new Dictionary<string, object>
+                    {
+                        ["title"] = sample.Title ?? "",
+                        ["process"] = sample.Process ?? "",
+                        ["idle_seconds"] = sample.IdleSeconds,
+                        ["machine"] = Environment.MachineName,
+                        ["lrn"] = lrn
+                    },
+                    ["created_at"] = sample.SampledAtUtc.ToString("o")
+                });
+            }
+
+            if (_activityBuffer.Count < 1)
+            {
+                return;
+            }
+
+            var baseUrl = ReadConfigValue("server_base_url");
+            var machineKey = ReadFirstLine(KeyPath);
+            if (string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(machineKey))
+            {
+                return;
+            }
+
+            try
+            {
+                var body = BuildActivityPostBody(_activityBuffer);
+                ApiPost(baseUrl.TrimEnd('/') + "/api/pc/activity.php", machineKey, body);
+                _activityBuffer.Clear();
+            }
+            catch
+            {
+                if (_activityBuffer.Count > 40)
+                {
+                    _activityBuffer.RemoveRange(0, _activityBuffer.Count - 40);
+                }
+            }
+        }
+
+        private static string BuildActivityPostBody(List<Dictionary<string, object>> events)
+        {
+            var sb = new StringBuilder();
+            sb.Append("{\"events\":[");
+            for (var i = 0; i < events.Count; i++)
+            {
+                if (i > 0) sb.Append(',');
+                sb.Append(SerializeEvent(events[i]));
+            }
+            sb.Append("]}");
+            return sb.ToString();
+        }
+
+        private static string SerializeEvent(Dictionary<string, object> ev)
+        {
+            var type = EscapeJson(Convert.ToString(ev["event_type"]) ?? "");
+            var createdAt = EscapeJson(Convert.ToString(ev["created_at"]) ?? "");
+            var payload = ev["payload"] as Dictionary<string, object>;
+            var title = EscapeJson(Convert.ToString(payload?["title"]) ?? "");
+            var process = EscapeJson(Convert.ToString(payload?["process"]) ?? "");
+            var idle = payload != null && payload.ContainsKey("idle_seconds") ? Convert.ToString(payload["idle_seconds"]) : "0";
+            var machine = EscapeJson(Convert.ToString(payload?["machine"]) ?? "");
+            var lrn = EscapeJson(Convert.ToString(payload?["lrn"]) ?? "");
+            return "{\"event_type\":\"" + type + "\",\"created_at\":\"" + createdAt
+                + "\",\"payload\":{\"title\":\"" + title + "\",\"process\":\"" + process
+                + "\",\"idle_seconds\":" + idle + ",\"machine\":\"" + machine + "\",\"lrn\":\"" + lrn + "\"}}";
+        }
+
+        private static string EscapeJson(string value)
+        {
+            return (value ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"");
+        }
+
+        private string ReadStateLrn()
+        {
+            try
+            {
+                if (!File.Exists(StatePath))
+                {
+                    return "";
+                }
+                var raw = File.ReadAllText(StatePath);
+                var m = System.Text.RegularExpressions.Regex.Match(raw, "\"last_lrn\"\\s*:\\s*\"([^\"]*)\"");
+                return m.Success ? (m.Groups[1].Value ?? "").Trim() : "";
+            }
+            catch
+            {
+                return "";
+            }
+        }
+
+        private void SendReplyButton_Click(object sender, RoutedEventArgs e)
+        {
+            var body = (ReplyTextBox.Text ?? "").Trim();
+            if (body == "")
+            {
+                MessageBox.Show("Enter a reply first.", "XPLabs Widget", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            if (_activeThreadId <= 0)
+            {
+                MessageBox.Show("No active message thread. Wait for an instructor message.", "XPLabs Widget", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            var lrn = _activeLrn;
+            if (string.IsNullOrWhiteSpace(lrn) && File.Exists(StatePath))
+            {
+                lrn = JsonTiny.TryGetString(File.ReadAllText(StatePath, Encoding.UTF8), "last_lrn", "");
+            }
+            if (string.IsNullOrWhiteSpace(lrn))
+            {
+                MessageBox.Show("Student LRN is unknown. Log in on the lock screen first.", "XPLabs Widget", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var baseUrl = ReadConfigValue("server_base_url");
+            var machineKey = ReadFirstLine(KeyPath);
+            if (string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(machineKey))
+            {
+                MessageBox.Show("Agent is not configured (server URL or machine key missing).", "XPLabs Widget", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            try
+            {
+                var payload = "{\"thread_id\":" + _activeThreadId + ",\"lrn\":\"" + EscapeJson(lrn) + "\",\"body\":\"" + EscapeJson(body) + "\"}";
+                ApiPost(baseUrl.TrimEnd('/') + "/api/pc/message-reply.php", machineKey, payload);
+                ReplyTextBox.Clear();
+                MessagesStatusText.Text = "Reply sent.";
+                RefreshMessages(silent: true);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Send failed: " + ex.Message, "XPLabs Widget", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void RefreshMessagesButton_Click(object sender, RoutedEventArgs e)
+        {
+            RefreshMessages(silent: false);
+        }
+
+        private void TitleBar_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (e.ClickCount == 2)
+            {
+                return;
+            }
+            try { DragMove(); } catch { /* ignore */ }
         }
 
         private void TryRefreshFromApi(ref string hostname, ref string userDisplay, ref string subjectDisplay, ref string lastServerTime, StringBuilder statusBuilder)

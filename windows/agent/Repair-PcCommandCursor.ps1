@@ -1,5 +1,8 @@
-# Reset agent command cursor when dashboard lock/unlock stops working after a server queue reset.
-param([switch] $ResetToZero)
+# Resets agent command cursor so stranded pending remote_commands are delivered again.
+# Run as Administrator on the lab PC when website lock/unlock/message commands stop working.
+param(
+  [switch] $ResetToZero
+)
 
 $ErrorActionPreference = 'Stop'
 $agentDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -17,7 +20,8 @@ if ($ResetToZero) {
 
 Set-AgentState -State $state
 Write-Host "command cursor: $old -> $($state.last_command_cursor)" -ForegroundColor Green
+Write-Host "Restarting agent loop..."
 schtasks /End /TN XPLabsAgentLoop 2>$null | Out-Null
 Start-Sleep -Seconds 1
 schtasks /Run /TN XPLabsAgentLoop | Out-Null
-Write-Host "Agent loop restarted. Try lock from dashboard again."
+Write-Host "Done. Try lock/unlock from the website again."

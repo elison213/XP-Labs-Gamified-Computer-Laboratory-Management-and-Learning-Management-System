@@ -127,7 +127,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($commandId > $serverCursor) {
         $db->update('lab_pcs', ['last_command_cursor' => $commandId], 'id = ?', [$pc['id']]);
     }
-
     $pcService->emitProtocolDebugEvent((int) $pc['id'], 'command_ack_processed', 'info', [
         'pc_id' => (int) $pc['id'],
         'command_id' => $commandId,

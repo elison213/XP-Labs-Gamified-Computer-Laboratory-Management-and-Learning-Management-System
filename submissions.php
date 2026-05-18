@@ -7,6 +7,7 @@ require_once __DIR__ . '/includes/bootstrap.php';
 
 use XPLabs\Lib\Auth;
 use XPLabs\Lib\Database;
+use XPLabs\Services\AdminLogService;
 
 Auth::requireRole(['admin', 'teacher']);
 
@@ -20,6 +21,7 @@ $courses = $db->fetchAll("SELECT * FROM courses ORDER BY name ASC");
 // Filters
 $courseId = (int) ($_GET['course_id'] ?? 0);
 $statusFilter = $_GET['status'] ?? '';
+$searchFilter = trim((string) ($_GET['search'] ?? ''));
 
 // Build query for assignments
 $where = ['1=1'];
@@ -32,6 +34,13 @@ if ($courseId) {
 if ($statusFilter !== '') {
     $where[] = 's.status = ?';
     $params[] = $statusFilter;
+}
+if ($searchFilter !== '') {
+    $term = '%' . $searchFilter . '%';
+    $where[] = '(u.first_name LIKE ? OR u.last_name LIKE ? OR u.lrn LIKE ?
+        OR a.title LIKE ? OR c.name LIKE ? OR c.code LIKE ?
+        OR s.content LIKE ? OR s.feedback LIKE ?)';
+    array_push($params, $term, $term, $term, $term, $term, $term, $term, $term);
 }
 
 if ($role === 'teacher') {
@@ -77,6 +86,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
                 'feedback' => $feedback,
                 'status' => 'graded'
             ], 'id = ?', [$submissionId]);
+
+            (new AdminLogService())->log('grade_submission', 'submission', $submissionId, [
+                'score' => $score,
+                'max_points' => $maxPoints,
+            ]);
             
             $message = ['type' => 'success', 'text' => 'Submission graded successfully'];
             $submissions = $db->fetchAll(
@@ -260,8 +274,13 @@ $lateCount = count(array_filter($submissions, fn($s) => $s['status'] === 'late')
         <!-- Filters -->
         <div class="xp-card mb-4">
             <div class="card-body">
-                <form method="GET" class="row g-2">
+                <form method="GET" class="row g-2 align-items-end">
                     <div class="col-md-4">
+                        <label class="form-label">Search</label>
+                        <input type="search" name="search" class="form-control" placeholder="Student, LRN, assignment, course, content..." value="<?= e($searchFilter) ?>">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Course</label>
                         <select name="course_id" class="form-select">
                             <option value="">All Courses</option>
                             <?php foreach ($courses as $c): ?>
@@ -270,6 +289,7 @@ $lateCount = count(array_filter($submissions, fn($s) => $s['status'] === 'late')
                         </select>
                     </div>
                     <div class="col-md-2">
+                        <label class="form-label">Status</label>
                         <select name="status" class="form-select">
                             <option value="">All Status</option>
                             <option value="pending" <?= $statusFilter === 'pending' ? 'selected' : '' ?>>Pending</option>
@@ -279,7 +299,7 @@ $lateCount = count(array_filter($submissions, fn($s) => $s['status'] === 'late')
                         </select>
                     </div>
                     <div class="col-md-2">
-                        <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search me-1"></i> Filter</button>
+                        <button type="submit" class="btn btn-primary w-100" title="Search"><i class="bi bi-search"></i></button>
                     </div>
                     <div class="col-md-2">
                         <a href="submissions.php" class="btn btn-outline-secondary w-100">Clear</a>

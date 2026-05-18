@@ -1,0 +1,87 @@
+XPLabs One-Click Deployment Commands
+====================================
+
+Prerequisites
+-------------
+1) Run commands in elevated PowerShell (Run as Administrator).
+2) Ensure repo path exists:
+   C:\xampp\htdocs\xplabs
+3) For EXE build, install Inno Setup 6 (ISCC.exe).
+
+Build One-Click EXE
+-------------------
+Set-ExecutionPolicy Bypass -Scope Process -Force
+cd C:\xampp\htdocs\xplabs
+.\windows\config\Build-OneClickDeploymentExe.ps1 -ProjectPath "C:\xampp\htdocs\xplabs"
+
+Output (default):
+C:\xampp\htdocs\xplabs\dist\deploy\XPLabsOneClickDeploy-<version>.exe
+
+Run One-Click Flow (Script, interactive)
+----------------------------------------
+Set-ExecutionPolicy Bypass -Scope Process -Force
+cd C:\xampp\htdocs\xplabs
+.\windows\config\Invoke-OneClickDeployment.ps1
+
+Run Server Setup/Update Mode directly
+-------------------------------------
+Set-ExecutionPolicy Bypass -Scope Process -Force
+cd C:\xampp\htdocs\xplabs
+.\windows\config\Invoke-OneClickDeployment.ps1 `
+  -Mode server `
+  -ProjectPath "C:\xampp\htdocs\xplabs" `
+  -XamppPath "C:\xampp" `
+  -DatabaseName "xplabs" `
+  -DbUser "root"
+
+Run Client Deploy Mode directly
+-------------------------------
+Set-ExecutionPolicy Bypass -Scope Process -Force
+cd C:\xampp\htdocs\xplabs
+.\windows\config\Invoke-OneClickDeployment.ps1 `
+  -Mode client `
+  -ProjectPath "C:\xampp\htdocs\xplabs" `
+  -ServerBaseUrl "http://local.xplabs.com/xplabs" `
+  -FloorId 1 `
+  -StationId 1 `
+  -StartAgentNow
+
+Client Deploy + Optional UI payloads
+------------------------------------
+Set-ExecutionPolicy Bypass -Scope Process -Force
+cd C:\xampp\htdocs\xplabs
+.\windows\config\Invoke-OneClickDeployment.ps1 `
+  -Mode client `
+  -ProjectPath "C:\xampp\htdocs\xplabs" `
+  -ServerBaseUrl "http://local.xplabs.com/xplabs" `
+  -LockscreenExePath "C:\path\to\XPLabs.LockScreen\bin\Release\net48" `
+  -WidgetExePath "C:\path\to\XPLabs.Widget\bin\Release\net48" `
+  -StartAgentNow
+
+Server Validation Checks
+------------------------
+cd C:\xampp\htdocs\xplabs
+C:\xampp\php\php.exe C:\xampp\htdocs\xplabs\database\migrate.php
+Get-Service Apache2.4,mysql,mariadb,mysql80
+Test-NetConnection local.xplabs.com -Port 80
+
+Lab PC full rebuild from server (Administrator, on lab PC)
+--------------------------------------------------------
+# Replace YOUR-SERVER with XAMPP hostname or IP
+powershell -ExecutionPolicy Bypass -File "\\YOUR-SERVER\c$\xampp\htdocs\xplabs\windows\agent\Rebuild-LabClientFromServer.ps1" -ServerShare "\\YOUR-SERVER\c$\xampp\htdocs\xplabs\windows" -ResetState
+
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\XPLabsAgent\Get-AgentBuildInfo.ps1"
+
+Client Validation Checks
+------------------------
+Get-ScheduledTask -TaskName XPLabsAgentLoop,XPLabsLockScreen,XPLabsWidget -ErrorAction SilentlyContinue
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\XPLabsAgent\Run-AgentLoop.ps1" -Once
+Get-Content "$env:ProgramData\XPLabsAgent\logs\agent.log" -Tail 120
+Get-Content "$env:ProgramData\XPLabsAgent\logs\logon-lockscreen.log" -Tail 40
+Get-Process XPLabs.LockScreen,XPLabs.Widget -EA SilentlyContinue | Select Name,Id,SessionId
+
+Rollback (Client quick)
+-----------------------
+Stop-ScheduledTask -TaskName XPLabsAgentLoop -ErrorAction SilentlyContinue
+Start-ScheduledTask -TaskName XPLabsAgentLoop
+Remove-Item "C:\ProgramData\XPLabsAgent\heartbeat-spool\*.json" -Force -ErrorAction SilentlyContinue

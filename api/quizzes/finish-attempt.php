@@ -32,7 +32,7 @@ if (!$attemptId) {
 
 try {
     $quizService = new QuizService();
-    $result = $quizService->finishAttempt($attemptId);
+    $result = $quizService->finishAttempt($attemptId, Auth::id());
 
     if ($result['success']) {
         echo json_encode([

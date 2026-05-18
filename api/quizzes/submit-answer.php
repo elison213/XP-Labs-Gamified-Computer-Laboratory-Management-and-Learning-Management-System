@@ -35,7 +35,7 @@ if (!$attemptId || !$questionId || $answer === null) {
 
 try {
     $quizService = new QuizService();
-    $result = $quizService->submitAnswer($attemptId, $questionId, $answer, $powerupId);
+    $result = $quizService->submitAnswer($attemptId, $questionId, $answer, $powerupId, Auth::id());
 
     if ($result['success']) {
         echo json_encode($result);

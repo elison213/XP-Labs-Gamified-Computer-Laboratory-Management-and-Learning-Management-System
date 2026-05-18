@@ -238,3 +238,15 @@ Get-ChildItem "$env:ProgramData\XPLabsAgent\heartbeat-spool" -ErrorAction Silent
 - Log viewer is intentionally admin-gated on the client widget.
 - Core agent behavior and machine-key API contract remain unchanged.
 
+## Canonical deployment path
+- Server update (production): `windows/config/Apply-LabStabilityUpdate.ps1`
+- Client deployment (production): `windows/config/Deploy-ClientPowerShellApp.ps1`
+- Script classification/deprecation map: see [SCRIPT_CATALOG.md](C:/xampp/htdocs/xplabs/windows/SCRIPT_CATALOG.md)
+- One-click launcher (server/client): `windows/config/Invoke-OneClickDeployment.ps1`
+- One-click EXE builder: `windows/config/Build-OneClickDeploymentExe.ps1`
+- Operator command sheet: [DEPLOY_COMMANDS.txt](C:/xampp/htdocs/xplabs/windows/DEPLOY_COMMANDS.txt)
+
+## Emergency rollback
+- Client runtime rollback and spool cleanup: see [SCRIPT_CATALOG.md](C:/xampp/htdocs/xplabs/windows/SCRIPT_CATALOG.md)
+- Server rollback baseline (restore known-good files + Apache restart): see [SCRIPT_CATALOG.md](C:/xampp/htdocs/xplabs/windows/SCRIPT_CATALOG.md)
+
