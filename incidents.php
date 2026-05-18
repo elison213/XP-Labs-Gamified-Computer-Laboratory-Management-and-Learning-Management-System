@@ -19,15 +19,36 @@ $service = new IncidentService();
 $statusFilter = $_GET['status'] ?? '';
 $severityFilter = $_GET['severity'] ?? '';
 $typeFilter = $_GET['type'] ?? '';
+$labFilter = $_GET['lab_id'] ?? '';
+$assigneeFilter = $_GET['assigned_to'] ?? '';
+$dateFromFilter = $_GET['date_from'] ?? '';
+$dateToFilter = $_GET['date_to'] ?? '';
+$searchFilter = trim((string) ($_GET['search'] ?? ''));
 
 $incidents = $service->getIncidents(array_filter([
     'status' => $statusFilter,
     'severity' => $severityFilter,
     'type' => $typeFilter,
-]));
+    'lab_id' => $labFilter !== '' ? (int) $labFilter : null,
+    'assigned_to' => $assigneeFilter !== '' ? (int) $assigneeFilter : null,
+    'date_from' => $dateFromFilter !== '' ? $dateFromFilter : null,
+    'date_to' => $dateToFilter !== '' ? $dateToFilter : null,
+    'search' => $searchFilter !== '' ? $searchFilter : null,
+], static fn ($v) => $v !== null && $v !== ''));
 
-// Get stats
-$stats = $service->getStats();
+$labs = $db->fetchAll("SELECT id, name FROM labs WHERE is_active = 1 ORDER BY name ASC");
+$assignees = $db->fetchAll("SELECT id, first_name, last_name FROM users WHERE role IN ('admin', 'teacher') ORDER BY last_name ASC, first_name ASC");
+$stations = $db->fetchAll(
+    "SELECT ls.id, ls.station_code, lf.name AS floor_name, l.name AS lab_name
+     FROM lab_stations ls
+     INNER JOIN lab_floors lf ON ls.floor_id = lf.id
+     LEFT JOIN labs l ON lf.lab_id = l.id
+     ORDER BY l.name, lf.name, ls.station_code
+     LIMIT 800"
+);
+
+// Aggregate stats (all incidents; independent of current filters)
+$stats = $service->getStats() ?: [];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -174,25 +195,25 @@ $stats = $service->getStats();
         <div class="row g-3 mb-4">
             <div class="col-md-3">
                 <div class="stat-card">
-                    <div class="value text-primary"><?= count($incidents) ?></div>
-                    <div class="label">Total Incidents</div>
+                    <div class="value text-primary"><?= (int) ($stats['total'] ?? count($incidents)) ?></div>
+                    <div class="label">Total (all time)</div>
                 </div>
             </div>
             <div class="col-md-3">
                 <div class="stat-card">
-                    <div class="value text-warning"><?= count(array_filter($incidents, fn($i) => $i['status'] === 'reported')) ?></div>
-                    <div class="label">Open</div>
+                    <div class="value text-warning"><?= (int) ($stats['reported_count'] ?? 0) ?></div>
+                    <div class="label">Reported</div>
                 </div>
             </div>
             <div class="col-md-3">
                 <div class="stat-card">
-                    <div class="value" style="color: var(--orange)"><?= count(array_filter($incidents, fn($i) => $i['status'] === 'investigating')) ?></div>
+                    <div class="value" style="color: var(--orange)"><?= (int) ($stats['investigating_count'] ?? 0) ?></div>
                     <div class="label">Investigating</div>
                 </div>
             </div>
             <div class="col-md-3">
                 <div class="stat-card">
-                    <div class="value text-success"><?= count(array_filter($incidents, fn($i) => $i['status'] === 'resolved')) ?></div>
+                    <div class="value text-success"><?= (int) ($stats['resolved_count'] ?? 0) ?></div>
                     <div class="label">Resolved</div>
                 </div>
             </div>
@@ -201,8 +222,13 @@ $stats = $service->getStats();
         <!-- Filters -->
         <div class="xp-card mb-4">
             <div class="card-body">
-                <form method="GET" class="row g-2">
+                <form method="GET" class="row g-2 align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label small mb-0">Search</label>
+                        <input type="search" name="search" class="form-control" placeholder="Title, description, reporter, lab, station..." value="<?= e($searchFilter) ?>">
+                    </div>
                     <div class="col-md-2">
+                        <label class="form-label small mb-0">Status</label>
                         <select name="status" class="form-select">
                             <option value="">All Status</option>
                             <option value="reported" <?= $statusFilter === 'reported' ? 'selected' : '' ?>>Reported</option>
@@ -212,6 +238,7 @@ $stats = $service->getStats();
                         </select>
                     </div>
                     <div class="col-md-2">
+                        <label class="form-label small mb-0">Severity</label>
                         <select name="severity" class="form-select">
                             <option value="">All Severity</option>
                             <option value="low" <?= $severityFilter === 'low' ? 'selected' : '' ?>>Low</option>
@@ -221,6 +248,7 @@ $stats = $service->getStats();
                         </select>
                     </div>
                     <div class="col-md-2">
+                        <label class="form-label small mb-0">Type</label>
                         <select name="type" class="form-select">
                             <option value="">All Types</option>
                             <?php foreach (\XPLabs\Services\IncidentService::getIncidentTypes() as $key => $label): ?>
@@ -228,10 +256,36 @@ $stats = $service->getStats();
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="col-md-2 d-flex align-items-end">
+                    <div class="col-md-2">
+                        <label class="form-label small mb-0">Lab</label>
+                        <select name="lab_id" class="form-select">
+                            <option value="">All labs</option>
+                            <?php foreach ($labs as $l): ?>
+                            <option value="<?= (int) $l['id'] ?>" <?= (string) $labFilter === (string) $l['id'] ? 'selected' : '' ?>><?= e($l['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small mb-0">Assignee</label>
+                        <select name="assigned_to" class="form-select">
+                            <option value="">Anyone</option>
+                            <?php foreach ($assignees as $a): ?>
+                            <option value="<?= (int) $a['id'] ?>" <?= (string) $assigneeFilter === (string) $a['id'] ? 'selected' : '' ?>><?= e($a['first_name'] . ' ' . $a['last_name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small mb-0">From</label>
+                        <input type="date" name="date_from" class="form-control" value="<?= e($dateFromFilter) ?>">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small mb-0">To</label>
+                        <input type="date" name="date_to" class="form-control" value="<?= e($dateToFilter) ?>">
+                    </div>
+                    <div class="col-md-2">
                         <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search me-1"></i> Filter</button>
                     </div>
-                    <div class="col-md-2 d-flex align-items-end">
+                    <div class="col-md-2">
                         <a href="incidents.php" class="btn btn-outline-secondary w-100">Clear</a>
                     </div>
                 </form>
@@ -329,6 +383,33 @@ $stats = $service->getStats();
                             <label class="form-label">Description</label>
                             <textarea name="description" id="incident-description" class="form-control" rows="3"></textarea>
                         </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Lab</label>
+                            <select name="lab_id" id="incident-lab-id" class="form-select">
+                                <option value="">—</option>
+                                <?php foreach ($labs as $l): ?>
+                                <option value="<?= (int) $l['id'] ?>"><?= e($l['name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Station (optional)</label>
+                            <select name="station_id" id="incident-station-id" class="form-select">
+                                <option value="">—</option>
+                                <?php foreach ($stations as $st): ?>
+                                <option value="<?= (int) $st['id'] ?>"><?= e(($st['lab_name'] ?? '') . ' · ' . ($st['floor_name'] ?? '') . ' · ' . ($st['station_code'] ?? '')) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6" id="assign-field" style="display: none;">
+                            <label class="form-label">Assignee</label>
+                            <select name="assigned_to" id="incident-assigned-to" class="form-select">
+                                <option value="">—</option>
+                                <?php foreach ($assignees as $a): ?>
+                                <option value="<?= (int) $a['id'] ?>"><?= e($a['first_name'] . ' ' . $a['last_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
                         <div class="col-md-6" id="status-field" style="display: none;">
                             <label class="form-label">Status</label>
                             <select name="status" id="incident-status" class="form-select">
@@ -380,7 +461,10 @@ $stats = $service->getStats();
         document.getElementById('modal-title').textContent = 'Report Incident';
         document.getElementById('status-field').style.display = 'none';
         document.getElementById('resolution-field').style.display = 'none';
+        document.getElementById('assign-field').style.display = 'none';
         document.getElementById('delete-btn').style.display = 'none';
+        document.getElementById('incident-lab-id').value = '';
+        document.getElementById('incident-station-id').value = '';
         new bootstrap.Modal(document.getElementById('modalIncident')).show();
     }
 
@@ -393,35 +477,78 @@ $stats = $service->getStats();
         document.getElementById('incident-description').value = inc.description || '';
         document.getElementById('incident-status').value = inc.status;
         document.getElementById('incident-resolution-notes').value = inc.resolution_notes || '';
+        document.getElementById('incident-lab-id').value = inc.lab_id || '';
+        document.getElementById('incident-station-id').value = inc.station_id || '';
+        document.getElementById('incident-assigned-to').value = inc.assigned_to || '';
         document.getElementById('modal-title').textContent = 'Edit Incident #' + inc.id;
         document.getElementById('status-field').style.display = 'block';
         document.getElementById('resolution-field').style.display = 'block';
+        document.getElementById('assign-field').style.display = 'block';
         document.getElementById('delete-btn').style.display = 'inline-block';
         new bootstrap.Modal(document.getElementById('modalIncident')).show();
     }
 
-    function viewIncident(inc) {
+    async function viewIncident(inc) {
         document.getElementById('view-title').textContent = 'Incident #' + inc.id + ': ' + inc.title;
-        document.getElementById('view-body').innerHTML = `
-            <div class="row g-3">
-                <div class="col-6"><strong>Type:</strong> <?= ucfirst('${inc.type}') ?></div>
-                <div class="col-6"><strong>Severity:</strong> <span class="severity-badge ${inc.severity}">${inc.severity.charAt(0).toUpperCase() + inc.severity.slice(1)}</span></div>
-                <div class="col-6"><strong>Status:</strong> <span class="status-badge ${inc.status}">${inc.status.charAt(0).toUpperCase() + inc.status.slice(1)}</span></div>
-                <div class="col-6"><strong>Date:</strong> ${new Date(inc.created_at).toLocaleDateString()}</div>
-                <div class="col-6"><strong>Reported By:</strong> ${inc.reporter_first} ${inc.reporter_last}</div>
-                ${inc.lab_name ? `<div class="col-6"><strong>Location:</strong> ${inc.lab_name}</div>` : ''}
-                <div class="col-12"><strong>Description:</strong><p class="mt-1">${inc.description || 'None'}</p></div>
-                ${inc.resolution_notes ? `<div class="col-12"><strong>Resolution Notes:</strong><p class="mt-1">${inc.resolution_notes}</p></div>` : ''}
-                ${inc.resolved_at ? `<div class="col-6"><strong>Resolved At:</strong> ${new Date(inc.resolved_at).toLocaleString()}</div>` : ''}
-            </div>
-        `;
+        document.getElementById('view-body').innerHTML = '<p class="text-muted">Loading…</p>';
         new bootstrap.Modal(document.getElementById('modalView')).show();
+        try {
+            const res = await fetch('/api/incidents/detail.php?id=' + encodeURIComponent(inc.id));
+            const data = await res.json();
+            if (!data.success || !data.incident) {
+                document.getElementById('view-body').innerHTML = '<p>Could not load incident.</p>';
+                return;
+            }
+            const i = data.incident;
+            const logs = data.logs || [];
+            const esc = (s) => {
+                const d = document.createElement('div');
+                d.textContent = s == null ? '' : String(s);
+                return d.innerHTML;
+            };
+            let logHtml = '';
+            if (logs.length) {
+                logHtml = '<div class="col-12 mt-3"><strong>Activity</strong><ul class="small mt-2 mb-0">';
+                logs.forEach(l => {
+                    logHtml += `<li>${esc(l.created_at)} — ${esc(l.first_name)} ${esc(l.last_name)}: ${esc(l.action)} ${esc(l.notes || '')}</li>`;
+                });
+                logHtml += '</ul></div>';
+            }
+            const sev = i.severity || '';
+            const st = i.status || '';
+            document.getElementById('view-body').innerHTML = `
+            <div class="row g-3">
+                <div class="col-6"><strong>Type:</strong> ${esc(i.type)}</div>
+                <div class="col-6"><strong>Severity:</strong> <span class="severity-badge ${sev}">${esc(sev).charAt(0).toUpperCase() + esc(sev).slice(1)}</span></div>
+                <div class="col-6"><strong>Status:</strong> <span class="status-badge ${st}">${esc(st).charAt(0).toUpperCase() + esc(st).slice(1)}</span></div>
+                <div class="col-6"><strong>Date:</strong> ${new Date(i.created_at).toLocaleString()}</div>
+                <div class="col-6"><strong>Reported By:</strong> ${esc(i.reporter_first)} ${esc(i.reporter_last)}</div>
+                ${i.assignee_first ? `<div class="col-6"><strong>Assignee:</strong> ${esc(i.assignee_first)} ${esc(i.assignee_last)}</div>` : ''}
+                ${i.lab_name ? `<div class="col-6"><strong>Lab:</strong> ${esc(i.lab_name)}</div>` : ''}
+                ${i.station_code ? `<div class="col-6"><strong>Station:</strong> ${esc(i.station_code)}</div>` : ''}
+                <div class="col-12"><strong>Description:</strong><p class="mt-1">${esc(i.description) || 'None'}</p></div>
+                ${i.resolution_notes ? `<div class="col-12"><strong>Resolution Notes:</strong><p class="mt-1">${esc(i.resolution_notes)}</p></div>` : ''}
+                ${i.resolved_at ? `<div class="col-6"><strong>Resolved At:</strong> ${new Date(i.resolved_at).toLocaleString()}</div>` : ''}
+                ${logHtml}
+            </div>`;
+        } catch (e) {
+            document.getElementById('view-body').innerHTML = '<p class="text-danger">Failed to load details.</p>';
+        }
     }
 
     document.getElementById('incidentForm').addEventListener('submit', async function(e) {
         e.preventDefault();
         const formData = new FormData(this);
         const data = Object.fromEntries(formData);
+        if (data.action === 'update') {
+            if (data.assigned_to === '') data.assigned_to = null;
+            if (data.lab_id === '') data.lab_id = null;
+            if (data.station_id === '') data.station_id = null;
+        } else {
+            ['lab_id', 'station_id', 'assigned_to'].forEach(k => {
+                if (data[k] === '') delete data[k];
+            });
+        }
         
         try {
             const response = await fetch('/api/incidents/create.php', {

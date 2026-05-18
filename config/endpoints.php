@@ -35,6 +35,10 @@ return [
 
     // Door Kiosk
     'POST /api/kiosk/unlock' => 'api/kiosk/unlock.php',
+    'POST /api/kiosk/pair'   => 'api/kiosk/pair.php',
+    'GET  /api/kiosk/devices'  => 'api/kiosk/devices.php',
+    'POST /api/kiosk/devices'  => 'api/kiosk/devices.php',
+    'PATCH /api/kiosk/devices' => 'api/kiosk/devices.php',
 
     // Quizzes
     'GET    /api/quizzes/list'         => 'api/quizzes/list.php',
@@ -73,11 +77,16 @@ return [
 
     // Incidents
     'GET    /api/incidents'       => 'api/incidents/list.php',
+    'GET    /api/incidents/detail' => 'api/incidents/detail.php',
     'POST   /api/incidents/create' => 'api/incidents/create.php',
 
-    // Inventory
-    'GET    /api/inventory'       => 'api/inventory/list.php',
-    'POST   /api/inventory/create' => 'api/inventory/create.php',
+    // PC direct messaging (instructor to lab PC, agent popup + student reply)
+    'POST   /api/lab/pc-message'  => 'api/lab/pc-message.php',
+    'GET    /api/lab/pc-messages' => 'api/lab/pc-messages.php',
+    'POST   /api/pc/message-reply' => 'api/pc/message-reply.php',
+    'GET    /api/pc/messages' => 'api/pc/messages.php',
+    'GET    /api/pc/activity' => 'api/pc/activity.php',
+    'POST   /api/pc/activity' => 'api/pc/activity.php',
 
     // Analytics
     'GET    /api/analytics/attendance' => 'api/analytics/attendance.php',

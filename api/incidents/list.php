@@ -17,6 +17,9 @@ $filters = [
     'severity' => $_GET['severity'] ?? null,
     'type' => $_GET['type'] ?? null,
     'lab_id' => !empty($_GET['lab_id']) ? (int)$_GET['lab_id'] : null,
+    'assigned_to' => !empty($_GET['assigned_to']) ? (int)$_GET['assigned_to'] : null,
+    'date_from' => !empty($_GET['date_from']) ? $_GET['date_from'] : null,
+    'date_to' => !empty($_GET['date_to']) ? $_GET['date_to'] : null,
     'limit' => !empty($_GET['limit']) ? (int)$_GET['limit'] : 100,
 ];
 

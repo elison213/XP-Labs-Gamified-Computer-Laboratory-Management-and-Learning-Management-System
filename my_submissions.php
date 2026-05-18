@@ -11,6 +11,15 @@ Auth::requireRole('student');
 
 $userId = Auth::id();
 $db = Database::getInstance();
+$searchFilter = trim((string) ($_GET['search'] ?? ''));
+
+$where = ['s.user_id = ?'];
+$params = [$userId];
+if ($searchFilter !== '') {
+    $term = '%' . $searchFilter . '%';
+    $where[] = '(a.title LIKE ? OR c.name LIKE ? OR c.code LIKE ? OR s.content LIKE ? OR s.feedback LIKE ? OR s.status LIKE ?)';
+    array_push($params, $term, $term, $term, $term, $term, $term);
+}
 
 // Get student's submissions
 $submissions = $db->fetchAll(
@@ -19,9 +28,9 @@ $submissions = $db->fetchAll(
      FROM submissions s
      JOIN assignments a ON s.assignment_id = a.id
      LEFT JOIN courses c ON a.course_id = c.id
-     WHERE s.user_id = ?
+     WHERE " . implode(' AND ', $where) . "
      ORDER BY s.submitted_at DESC",
-    [$userId]
+    $params
 );
 
 // Count by status
@@ -150,6 +159,23 @@ $averageGrade = $gradedAssignments > 0 ? round($totalPoints / $gradedAssignments
             <div>
                 <h2 class="mb-1"><i class="bi bi-upload me-2"></i>My Submissions</h2>
                 <p class="text-muted mb-0">Track your submitted assignments and grades</p>
+            </div>
+        </div>
+
+        <div class="xp-card mb-4">
+            <div class="card-body">
+                <form method="GET" class="row g-2 align-items-end">
+                    <div class="col-md-8">
+                        <label class="form-label">Search</label>
+                        <input type="search" name="search" class="form-control" placeholder="Assignment, course, status, content..." value="<?= e($searchFilter) ?>">
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search"></i></button>
+                    </div>
+                    <div class="col-md-2">
+                        <a href="my_submissions.php" class="btn btn-outline-secondary w-100">Clear</a>
+                    </div>
+                </form>
             </div>
         </div>
 

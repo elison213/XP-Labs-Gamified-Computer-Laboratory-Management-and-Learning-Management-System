@@ -61,3 +61,19 @@ Run:\n
 
 This removes scheduled tasks and the program folder (keeps ProgramData by default).\n
 
+## 7) Hybrid scaling model (recommended)
+- Use GPO startup install as the primary scalable path for domain-joined PCs.
+- Use app-managed deployment queue as fallback for newly discovered/missed PCs.
+- Exclusions are enforced by app policy (`config/app.php` `pc_auto_deploy`):
+  - deny VLAN/subnet ranges for AP/infra segments,
+  - deny tags such as `exclude_auto_deploy`.
+
+## 8) Validation checklist for rollout
+- In `dashboard_lab_pcs.php`, verify deployment badges (`pending`, `in_progress`, `installed`, `failed`, `excluded`).
+- Run policy evaluation from dashboard and confirm excluded devices show a reason.
+- Queue deployments in small batches first, then run queued jobs.
+- Confirm client writes:
+  - `C:\\ProgramData\\XPLabsAgent\\agent.config.json`
+  - `C:\\ProgramData\\XPLabsAgent\\machine_key.txt`
+  - `C:\\ProgramData\\XPLabsAgent\\logs\\agent.log`
+

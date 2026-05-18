@@ -47,6 +47,16 @@ if ($pc['floor_id']) {
 if ($pc['station_id']) {
     $db = \XPLabs\Lib\Database::getInstance();
     $stationInfo = $db->fetch("SELECT * FROM lab_stations WHERE id = ?", [$pc['station_id']]);
+    if ($stationInfo) {
+        $effectiveStatus = strtolower((string) ($pc['status'] ?? 'offline'));
+        $heartbeatTs = strtotime((string) ($pc['last_heartbeat'] ?? ''));
+        if ($heartbeatTs === false || (time() - $heartbeatTs) > 300) {
+            $effectiveStatus = 'offline';
+        } elseif ($effectiveStatus === 'online' || $effectiveStatus === 'locked') {
+            $effectiveStatus = 'idle';
+        }
+        $stationInfo['status'] = $effectiveStatus;
+    }
 }
 
 // Get drive mappings for a default role (student) - override if user logs in
@@ -66,13 +76,18 @@ echo json_encode([
         'floor_id' => $pc['floor_id'],
         'station_id' => $pc['station_id'],
         'status' => $pc['status'],
+        'assignment_status' => $pc['assignment_status'] ?? null,
+        'discovery_source' => $pc['discovery_source'] ?? null,
     ],
     'floor' => $floorInfo,
     'station' => $stationInfo,
     'config' => [
         'auto_lock_idle_minutes' => $config['auto_lock_idle_minutes'] ?? 15,
         'check_grace_period_minutes' => $config['check_grace_period_minutes'] ?? 5,
-        'heartbeat_interval_seconds' => $config['heartbeat_interval_seconds'] ?? 120,
+        'heartbeat_interval_seconds' => $config['heartbeat_interval_seconds'] ?? 30,
+        'command_poll_interval_seconds' => $config['command_poll_interval_seconds'] ?? 5,
+        'validate_interval_seconds' => $config['validate_interval_seconds'] ?? 10,
+        'validate_grace_minutes' => $config['validate_grace_minutes'] ?? 5,
         'disable_usb' => $config['disable_usb'] ?? false,
         'wallpaper_url' => $config['wallpaper_url'] ?? null,
     ],

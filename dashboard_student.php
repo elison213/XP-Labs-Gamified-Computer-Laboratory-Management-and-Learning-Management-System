@@ -21,6 +21,13 @@ $user = $db->fetch("SELECT * FROM users WHERE id = ?", [$userId]);
 $points = $pointService->getBalance($userId);
 $totalEarned = $pointService->getTotalEarned($userId);
 $rank = $pointService->getUserRank($userId);
+$shopPowerups = $db->fetchAll(
+    "SELECT id, code, name, icon, point_cost
+     FROM powerups
+     WHERE type = 'quiz' AND is_active = 1
+     ORDER BY point_cost ASC
+     LIMIT 6"
+);
 
 // Achievements
 $achievements = $db->fetchAll(
@@ -558,6 +565,31 @@ $leaderboardPos = $db->fetchOne(
                                 <div class="fw-semibold" style="color: var(--text)">My Profile</div>
                                 <small style="color: var(--text-muted) !important;">View details</small>
                             </div>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Powerup Shop Preview -->
+                <div class="xp-card mt-3" id="powerup-shop">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5><i class="bi bi-gem me-2"></i>Powerup Shop</h5>
+                        <span class="badge bg-warning text-dark"><?= (int) $points ?> pts</span>
+                    </div>
+                    <div class="card-body">
+                        <?php foreach ($shopPowerups as $sp): ?>
+                        <div class="d-flex justify-content-between align-items-center py-2 border-bottom" style="border-color: var(--border) !important;">
+                            <div>
+                                <strong><?= e(($sp['icon'] ?: '✨') . ' ' . $sp['name']) ?></strong>
+                                <div class="small text-muted"><?= e($sp['code']) ?></div>
+                            </div>
+                            <span class="badge <?= $points >= (int) $sp['point_cost'] ? 'bg-success' : 'bg-secondary' ?>"><?= (int) $sp['point_cost'] ?> pts</span>
+                        </div>
+                        <?php endforeach; ?>
+                        <?php if (empty($shopPowerups)): ?>
+                        <div class="text-muted small">No active quiz powerups configured.</div>
+                        <?php endif; ?>
+                        <a href="powerup_shop.php" class="btn btn-sm btn-primary w-100 mt-3">
+                            <i class="bi bi-gem me-1"></i>Open Powerup Shop
                         </a>
                     </div>
                 </div>

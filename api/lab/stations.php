@@ -8,10 +8,12 @@
 header('Content-Type: application/json');
 
 require_once __DIR__ . '/../../lib/Auth.php';
+require_once __DIR__ . '/../../lib/Csrf.php';
 require_once __DIR__ . '/../../lib/Database.php';
 require_once __DIR__ . '/../../services/LabService.php';
 
 use XPLabs\Lib\Auth;
+use XPLabs\Lib\Csrf;
 use XPLabs\Services\LabService;
 
 $isPublic = isset($_GET['public']) && $_GET['public'] === '1';
@@ -36,7 +38,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             'id' => $s['id'],
             'station_code' => $s['station_code'],
             'floor_id' => $s['floor_id'],
-            'status' => $s['is_maintenance'] ? 'maintenance' : ($s['status'] ?? 'offline'),
+            'status' => (!empty($s['is_maintenance']) ? 'maintenance' : ($s['status'] ?? 'offline')),
+            'manual_status' => $s['manual_status'] ?? ($s['status'] ?? 'offline'),
         ];
         if ($isPublic) {
             // Kiosk view only gets occupancy, no user/network metadata.
@@ -49,6 +52,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $base['task'] = $s['task'] ?? null;
         $base['hostname'] = $s['hostname'] ?? null;
         $base['ip_address'] = $s['ip_address'] ?? null;
+        $base['row_label'] = $s['row_label'] ?? null;
+        $base['col_number'] = isset($s['col_number']) ? (int) $s['col_number'] : null;
         return $base;
     }, $stations);
 
@@ -58,6 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
 if ($_SERVER['REQUEST_METHOD'] === 'PATCH') {
     Auth::requireRoles(['admin', 'teacher']);
+    Csrf::requireValidToken();
 
     $input = json_decode(file_get_contents('php://input'), true);
     $stationId = (int) ($input['id'] ?? ($_GET['id'] ?? 0));
@@ -74,7 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PATCH') {
         exit;
     }
 
-    $allowed = ['status', 'station_code', 'hostname', 'ip_address', 'is_maintenance'];
+    $allowed = ['status', 'station_code', 'hostname', 'ip_address', 'mac_address'];
     $update = array_intersect_key($input, array_flip($allowed));
 
     if ($labService->updateStation($stationId, $update)) {

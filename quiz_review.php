@@ -1,33 +1,47 @@
 <?php
 /**
- * XPLabs - Quiz Review Page (Student)
- * Allows a student to view the detailed results of a completed quiz attempt.
+ * XPLabs - Quiz Review Page
+ * Students: own attempts. Staff: own preview attempts only.
  */
 require_once __DIR__ . '/includes/bootstrap.php';
 
 use XPLabs\Lib\Auth;
 use XPLabs\Services\QuizService;
 
-// Only students can view their own quiz review
-Auth::requireRole('student');
-
+Auth::require();
+$role = Auth::role();
 $userId = Auth::id();
 
-// Get the attempt ID from the query string
 $attemptId = (int) ($_GET['attempt_id'] ?? 0);
 if (!$attemptId) {
-    // No attempt ID provided – redirect back to the quizzes list
-    header('Location: my_quizzes.php');
+    header('Location: ' . (in_array($role, ['admin', 'teacher'], true) ? 'quizzes_manage.php' : 'my_quizzes.php'));
     exit;
 }
 
 $quizService = new QuizService();
 $result = $quizService->getResults($attemptId);
 
-// Ensure the attempt belongs to the current user and is in a reviewable state.
-$attemptStatus = $result['attempt']['status'] ?? '';
-if (!$result || $result['attempt']['user_id'] != $userId || $attemptStatus === 'in_progress') {
+$error = null;
+$isStaffPreview = false;
+$backHref = in_array($role, ['admin', 'teacher'], true) ? 'quizzes_manage.php' : 'my_quizzes.php';
+$backLabel = in_array($role, ['admin', 'teacher'], true) ? 'Back to Quiz Management' : 'Back to My Quizzes';
+
+if (!$result) {
     $error = 'Unable to retrieve quiz review. The attempt may not exist or is not reviewable yet.';
+} else {
+    $attemptStatus = $result['attempt']['status'] ?? '';
+    $isStaffPreview = in_array($role, ['admin', 'teacher'], true)
+        && $quizService->canStaffViewPreviewResults($attemptId, $userId, $role);
+
+    if ($attemptStatus === 'in_progress') {
+        $error = 'Unable to retrieve quiz review. The attempt may not exist or is not reviewable yet.';
+    } elseif ($role === 'student') {
+        if ((int) ($result['attempt']['user_id'] ?? 0) !== $userId) {
+            $error = 'Unable to retrieve quiz review. The attempt may not exist or is not reviewable yet.';
+        }
+    } elseif (!$isStaffPreview) {
+        $error = 'Unable to retrieve quiz review. The attempt may not exist or is not reviewable yet.';
+    }
 }
 
 ?>
@@ -62,8 +76,11 @@ if (!$result || $result['attempt']['user_id'] != $userId || $attemptStatus === '
     <div class="main-content">
         <?php if (!empty($error)): ?>
             <div class="alert alert-danger"><?= e($error) ?></div>
-            <a href="my_quizzes.php" class="btn btn-secondary mt-3">Back to My Quizzes</a>
+            <a href="<?= e($backHref) ?>" class="btn btn-secondary mt-3"><?= e($backLabel) ?></a>
         <?php else: ?>
+            <?php if (!empty($isStaffPreview)): ?>
+                <div class="alert alert-warning py-2 mb-3"><i class="bi bi-eye me-2"></i>This was a <strong>preview</strong> attempt — it does not affect student grades or leaderboards.</div>
+            <?php endif; ?>
             <h2 class="mb-4"><i class="bi bi-journal-check me-2"></i>Quiz Review</h2>
             <div class="card p-4 mb-4">
                 <h4 class="mb-2"><?= e($result['attempt']['title'] ?? 'Quiz') ?></h4>
@@ -103,7 +120,7 @@ if (!$result || $result['attempt']['user_id'] != $userId || $attemptStatus === '
                     <?php endif; ?>
                 </div>
             <?php endforeach; ?>
-            <a href="my_quizzes.php" class="btn btn-primary mt-3">Back to My Quizzes</a>
+            <a href="<?= e($backHref) ?>" class="btn btn-primary mt-3"><?= e($backLabel) ?></a>
         <?php endif; ?>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>

@@ -10,27 +10,108 @@ use XPLabs\Services\LabService;
 
 Auth::requireRole('admin');
 
-$labService = new LabService();
-$labs = $labService->getLabs();
-$selectedLabId = (int) ($_GET['lab_id'] ?? ($labs[0]['id'] ?? 0));
-$floors = $labService->getFloors($selectedLabId);
-$selectedFloorId = (int) ($_GET['floor_id'] ?? ($floors[0]['id'] ?? 0));
-$stations = $labService->getStations($selectedFloorId);
-$stats = $labService->getStats($selectedFloorId);
-$currentLab = null;
-$currentFloor = null;
-foreach ($labs as $l) { if ($l['id'] == $selectedLabId) { $currentLab = $l; break; } }
-foreach ($floors as $f) { if ($f['id'] == $selectedFloorId) { $currentFloor = $f; break; } }
+$adminSystemScript = basename($_SERVER['SCRIPT_NAME'] ?? 'admin_system.php');
 
-// Handle actions
-$message = null;
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
+$labService = new LabService();
+$resolveContext = static function (LabService $service, int $requestedLabId, int $requestedFloorId): array {
+    $labs = $service->getLabs();
+    $selectedLabId = 0;
+    $currentLab = null;
+    if (!empty($labs)) {
+        foreach ($labs as $lab) {
+            if ((int) $lab['id'] === $requestedLabId) {
+                $currentLab = $lab;
+                break;
+            }
+        }
+        if ($currentLab === null) {
+            $currentLab = $labs[0];
+        }
+        $selectedLabId = (int) $currentLab['id'];
+    }
+
+    $floors = $selectedLabId > 0 ? $service->getFloors($selectedLabId) : [];
+    $selectedFloorId = 0;
+    $currentFloor = null;
+    if (!empty($floors)) {
+        foreach ($floors as $floor) {
+            if ((int) $floor['id'] === $requestedFloorId) {
+                $currentFloor = $floor;
+                break;
+            }
+        }
+        if ($currentFloor === null) {
+            $currentFloor = $floors[0];
+        }
+        $selectedFloorId = (int) $currentFloor['id'];
+    }
+
+    return [
+        'labs' => $labs,
+        'selected_lab_id' => $selectedLabId,
+        'current_lab' => $currentLab,
+        'floors' => $floors,
+        'selected_floor_id' => $selectedFloorId,
+        'current_floor' => $currentFloor,
+    ];
+};
+
+$context = $resolveContext(
+    $labService,
+    (int) ($_GET['lab_id'] ?? 0),
+    (int) ($_GET['floor_id'] ?? 0)
+);
+$labs = $context['labs'];
+$selectedLabId = $context['selected_lab_id'];
+$currentLab = $context['current_lab'];
+$floors = $context['floors'];
+$selectedFloorId = $context['selected_floor_id'];
+$currentFloor = $context['current_floor'];
+$stations = $selectedFloorId > 0 ? $labService->getStations($selectedFloorId) : [];
+$stats = $selectedFloorId > 0 ? $labService->getStats($selectedFloorId) : ['total' => 0, 'active' => 0, 'idle' => 0, 'offline' => 0, 'maintenance' => 0];
+
+if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    $getLabId = (int) ($_GET['lab_id'] ?? 0);
+    $getFloorId = (int) ($_GET['floor_id'] ?? 0);
+    $needRedirect = false;
+    if ($getLabId > 0 && $getLabId !== $selectedLabId) {
+        $needRedirect = true;
+    }
+    if ($getFloorId > 0 && $getFloorId !== $selectedFloorId) {
+        $needRedirect = true;
+    }
+    if ($needRedirect) {
+        if ($selectedLabId > 0) {
+            $url = $adminSystemScript . '?lab_id=' . $selectedLabId;
+            if ($selectedFloorId > 0) {
+                $url .= '&floor_id=' . $selectedFloorId;
+            }
+        } else {
+            $url = $adminSystemScript;
+        }
+        header('Location: ' . $url, true, 302);
+        exit;
+    }
+}
+
+$message = $_SESSION['admin_system_flash'] ?? null;
+unset($_SESSION['admin_system_flash']);
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!verify_csrf()) {
+        $message = ['type' => 'danger', 'text' => 'Invalid request token. Please refresh and try again.'];
+    } else {
+        $selectedLabId = (int) ($_POST['selected_lab_id'] ?? $selectedLabId);
+        $selectedFloorId = (int) ($_POST['selected_floor_id'] ?? $selectedFloorId);
+        $context = $resolveContext($labService, $selectedLabId, $selectedFloorId);
+        $selectedLabId = $context['selected_lab_id'];
+        $selectedFloorId = $context['selected_floor_id'];
+
     $action = $_POST['action'] ?? '';
 
     try {
         switch ($action) {
             case 'add_lab':
-                $labService->createLab([
+                $newLabId = (int) $labService->createLab([
                     'name' => $_POST['name'],
                     'description' => $_POST['description'] ?? null,
                     'building' => $_POST['building'] ?? null,
@@ -38,6 +119,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
                     'grid_cols' => (int) ($_POST['grid_cols'] ?? 6),
                     'grid_rows' => (int) ($_POST['grid_rows'] ?? 5),
                 ]);
+                $selectedLabId = $newLabId;
+                $context = $resolveContext($labService, $selectedLabId, 0);
+                $selectedFloorId = $context['selected_floor_id'];
                 $message = ['type' => 'success', 'text' => 'Lab created successfully'];
                 break;
             case 'update_lab':
@@ -52,10 +136,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
                 $message = ['type' => 'success', 'text' => 'Lab updated successfully'];
                 break;
             case 'delete_lab':
-                $labService->deleteLab((int) $_POST['lab_id']);
+                if (!$labService->deleteLab((int) $_POST['lab_id'])) {
+                    throw new \RuntimeException('Lab could not be deleted (not found or already removed).');
+                }
+                $context = $resolveContext($labService, 0, 0);
+                $selectedLabId = $context['selected_lab_id'];
+                $selectedFloorId = $context['selected_floor_id'];
                 $message = ['type' => 'success', 'text' => 'Lab deleted successfully'];
                 break;
             case 'add_floor':
+                if ($selectedLabId <= 0) {
+                    throw new \RuntimeException('Select a valid lab before adding a floor.');
+                }
                 $labService->createFloor([
                     'name' => $_POST['name'],
                     'lab_id' => $selectedLabId,
@@ -64,9 +156,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
                     'grid_cols' => (int) ($_POST['grid_cols'] ?? 6),
                     'grid_rows' => (int) ($_POST['grid_rows'] ?? 5),
                 ]);
+                $context = $resolveContext($labService, $selectedLabId, 0);
+                $selectedFloorId = $context['selected_floor_id'];
                 $message = ['type' => 'success', 'text' => 'Floor created successfully'];
                 break;
             case 'add_station':
+                if ($selectedFloorId <= 0) {
+                    throw new \RuntimeException('Select a valid floor before adding a station.');
+                }
                 $labService->createStation([
                     'floor_id' => $selectedFloorId,
                     'station_code' => $_POST['station_code'],
@@ -103,16 +200,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
     } catch (\Exception $e) {
         $message = ['type' => 'danger', 'text' => $e->getMessage()];
     }
-
-    // Refresh data
-    $labs = $labService->getLabs();
-    $floors = $labService->getFloors($selectedLabId);
-    $stations = $labService->getStations($selectedFloorId);
-    $stats = $labService->getStats($selectedFloorId);
-    $currentLab = null;
-    $currentFloor = null;
-    foreach ($labs as $l) { if ($l['id'] == $selectedLabId) { $currentLab = $l; break; } }
-    foreach ($floors as $f) { if ($f['id'] == $selectedFloorId) { $currentFloor = $f; break; } }
+        $_SESSION['admin_system_flash'] = $message;
+        if ($selectedLabId > 0) {
+            $redirect = $adminSystemScript . '?lab_id=' . $selectedLabId;
+            if ($selectedFloorId > 0) {
+                $redirect .= '&floor_id=' . $selectedFloorId;
+            }
+        } else {
+            $redirect = $adminSystemScript;
+        }
+        header('Location: ' . $redirect);
+        exit;
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -194,7 +293,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
         }
         .lab-tab:hover { border-color: var(--accent); color: var(--text); }
         .lab-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-        .lab-tab .badge { font-size: 0.65rem; background: rgba(99,102,241,0.2); color: var(--accent); }
+        .lab-tab .badge { font-size: 0.65rem; background: rgba(99,102,241,0.2); color: var(--accent); pointer-events: none; }
 
         .floor-tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
         .floor-tab {
@@ -228,16 +327,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
                 <p class="text-muted mb-0">Manage labs, floors, and stations</p>
             </div>
             <div class="d-flex gap-2">
-                <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalAddLab">
+                <button type="button" class="btn btn-primary btn-sm" onclick="openModal('modalAddLab')">
                     <i class="bi bi-plus-lg me-1"></i> Add Lab
                 </button>
                 <?php if ($selectedLabId): ?>
-                <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#modalAddFloor">
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="openModal('modalEditLab')">
+                    <i class="bi bi-pencil me-1"></i> Edit Lab
+                </button>
+                <form method="POST" class="d-inline" onsubmit="return confirm('Delete this lab and all of its floors and stations? This cannot be undone.');">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="action" value="delete_lab">
+                    <input type="hidden" name="lab_id" value="<?= (int) $selectedLabId ?>">
+                    <input type="hidden" name="selected_lab_id" value="<?= (int) $selectedLabId ?>">
+                    <input type="hidden" name="selected_floor_id" value="<?= (int) $selectedFloorId ?>">
+                    <button type="submit" class="btn btn-outline-danger btn-sm">
+                        <i class="bi bi-trash me-1"></i> Delete Lab
+                    </button>
+                </form>
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="openModal('modalAddFloor')">
                     <i class="bi bi-building me-1"></i> Add Floor
                 </button>
                 <?php endif; ?>
                 <?php if ($selectedFloorId): ?>
-                <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#modalAddStation">
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="openModal('modalAddStation')">
                     <i class="bi bi-pc-display me-1"></i> Add Station
                 </button>
                 <?php endif; ?>
@@ -254,9 +366,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
         <!-- Lab Tabs -->
         <div class="lab-tabs">
             <?php foreach ($labs as $lab): 
-                $floorCount = (int) $labService->getFloors($lab['id']) ? count($labService->getFloors($lab['id'])) : 0;
+                $labFloors = $labService->getFloors((int) $lab['id']);
+                $floorCount = count($labFloors);
             ?>
-            <a href="?lab_id=<?= $lab['id'] ?>" class="lab-tab <?= $lab['id'] == $selectedLabId ? 'active' : '' ?>">
+            <a href="<?= e($adminSystemScript) ?>?lab_id=<?= (int) $lab['id'] ?>" class="lab-tab <?= (int) $lab['id'] === (int) $selectedLabId ? 'active' : '' ?>">
                 <i class="bi bi-building"></i> <?= e($lab['name']) ?>
                 <span class="badge"><?= $floorCount ?> floors</span>
             </a>
@@ -270,12 +383,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
         <!-- Floor Tabs -->
         <div class="floor-tabs">
             <?php foreach ($floors as $floor): ?>
-            <a href="?lab_id=<?= $selectedLabId ?>&floor_id=<?= $floor['id'] ?>" class="floor-tab <?= $floor['id'] == $selectedFloorId ? 'active' : '' ?>">
+            <a href="<?= e($adminSystemScript) ?>?lab_id=<?= (int) $selectedLabId ?>&floor_id=<?= (int) $floor['id'] ?>" class="floor-tab <?= (int) $floor['id'] === (int) $selectedFloorId ? 'active' : '' ?>">
                 <?= e($floor['name']) ?>
             </a>
             <?php endforeach; ?>
             <?php if (empty($floors)): ?>
-            <span class="text-muted small">No floors configured for this lab</span>
+            <div class="mb-2">
+                <span class="text-muted small d-block">This lab has no floors yet. Add a floor to place stations, or delete the lab if you no longer need it.</span>
+            </div>
             <?php endif; ?>
         </div>
 
@@ -320,6 +435,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
                 <h5><i class="bi bi-pc-display me-2"></i>Stations - <?= e($currentFloor['name']) ?></h5>
                 <span class="text-muted small"><?= count($stations) ?> stations</span>
             </div>
+            <div class="px-3 pt-2">
+                <div class="alert alert-info py-2 mb-2 small">
+                    Effective status comes from PC heartbeat/session state. Manual status is a fallback override used only when no fresh PC heartbeat is available.
+                </div>
+            </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
                     <table class="xp-table">
@@ -328,7 +448,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
                                 <th><input type="checkbox" id="select-all"></th>
                                 <th>Code</th>
                                 <th>Position</th>
-                                <th>Status</th>
+                                <th>Effective Status</th>
+                                <th>Manual Status</th>
                                 <th>User</th>
                                 <th>Hostname</th>
                                 <th>IP Address</th>
@@ -344,7 +465,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
                                 <td><input type="checkbox" class="station-check" value="<?= $s['id'] ?>"></td>
                                 <td><code><?= e($s['station_code']) ?></code></td>
                                 <td><?= e($s['row_label'] ?? '-') ?>-<?= $s['col_number'] ?? '-' ?></td>
-                                <td><span class="status-badge <?= $status ?>"><?= ucfirst($status) ?></span></td>
+                                <td>
+                                    <span class="status-badge <?= $status ?>"><?= ucfirst($status) ?></span>
+                                </td>
+                                <td>
+                                    <span class="text-muted small"><?= e((string) ($s['manual_status'] ?? 'offline')) ?></span>
+                                </td>
                                 <td><?= $user ?: '<span class="text-muted">—</span>' ?></td>
                                 <td><?= e($s['hostname'] ?? '—') ?></td>
                                 <td><?= e($s['ip_address'] ?? '—') ?></td>
@@ -355,6 +481,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
                                     <form method="POST" class="d-inline" onsubmit="return confirm('Delete this station?')">
                                         <?= csrf_field() ?>
                                         <input type="hidden" name="action" value="delete_station">
+                                        <input type="hidden" name="selected_lab_id" value="<?= (int) $selectedLabId ?>">
+                                        <input type="hidden" name="selected_floor_id" value="<?= (int) $selectedFloorId ?>">
                                         <input type="hidden" name="station_id" value="<?= $s['id'] ?>">
                                         <button type="submit" class="btn btn-sm btn-outline-danger">
                                             <i class="bi bi-trash"></i>
@@ -365,7 +493,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
                             <?php endforeach; ?>
                             <?php if (empty($stations)): ?>
                             <tr>
-                                <td colspan="8" class="text-center text-muted py-4">
+                                <td colspan="9" class="text-center text-muted py-4">
                                     No stations on this floor yet.
                                 </td>
                             </tr>
@@ -379,6 +507,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
                 <form method="POST" class="d-flex gap-2 align-items-center">
                     <?= csrf_field() ?>
                     <input type="hidden" name="action" value="bulk_status">
+                    <input type="hidden" name="selected_lab_id" value="<?= (int) $selectedLabId ?>">
+                    <input type="hidden" name="selected_floor_id" value="<?= (int) $selectedFloorId ?>">
                     <input type="hidden" name="station_ids" id="bulk-ids">
                     <select name="new_status" class="form-select form-select-sm" style="width:auto">
                         <option value="offline">Set Offline</option>
@@ -397,7 +527,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
                 <i class="bi bi-building fs-1 text-muted d-block mb-3"></i>
                 <h4>No Floor Selected</h4>
                 <p class="text-muted">Create a floor to get started</p>
-                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalAddFloor">
+                <button type="button" class="btn btn-primary" onclick="openModal('modalAddFloor')">
                     <i class="bi bi-plus-lg me-1"></i> Create First Floor
                 </button>
             </div>
@@ -409,7 +539,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
                 <i class="bi bi-building fs-1 text-muted d-block mb-3"></i>
                 <h4>No Lab Selected</h4>
                 <p class="text-muted">Create a lab to get started</p>
-                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalAddLab">
+                <button type="button" class="btn btn-primary" onclick="openModal('modalAddLab')">
                     <i class="bi bi-plus-lg me-1"></i> Create First Lab
                 </button>
             </div>
@@ -423,6 +553,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
             <form method="POST" class="modal-content">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="add_lab">
+                <input type="hidden" name="selected_lab_id" value="<?= (int) $selectedLabId ?>">
+                <input type="hidden" name="selected_floor_id" value="<?= (int) $selectedFloorId ?>">
                 <div class="modal-header">
                     <h5 class="modal-title">Add New Lab</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -463,12 +595,65 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
         </div>
     </div>
 
+    <?php if ($currentLab): ?>
+    <!-- Edit Lab Modal -->
+    <div class="modal fade" id="modalEditLab" tabindex="-1">
+        <div class="modal-dialog">
+            <form method="POST" class="modal-content">
+                <?= csrf_field() ?>
+                <input type="hidden" name="action" value="update_lab">
+                <input type="hidden" name="lab_id" value="<?= (int) $currentLab['id'] ?>">
+                <input type="hidden" name="selected_lab_id" value="<?= (int) $selectedLabId ?>">
+                <input type="hidden" name="selected_floor_id" value="<?= (int) $selectedFloorId ?>">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Lab</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Lab Name *</label>
+                        <input type="text" name="name" class="form-control" value="<?= e($currentLab['name'] ?? '') ?>" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea name="description" class="form-control" rows="2" placeholder="Brief description"><?= e($currentLab['description'] ?? '') ?></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Building</label>
+                        <input type="text" name="building" class="form-control" value="<?= e($currentLab['building'] ?? '') ?>" placeholder="e.g., Science Building">
+                    </div>
+                    <div class="row">
+                        <div class="col-4 mb-3">
+                            <label class="form-label">Floor Number</label>
+                            <input type="number" name="floor_number" class="form-control" value="<?= (int) ($currentLab['floor_number'] ?? 1) ?>" min="1">
+                        </div>
+                        <div class="col-4 mb-3">
+                            <label class="form-label">Grid Columns</label>
+                            <input type="number" name="grid_cols" class="form-control" value="<?= (int) ($currentLab['grid_cols'] ?? 6) ?>" min="2" max="12">
+                        </div>
+                        <div class="col-4 mb-3">
+                            <label class="form-label">Grid Rows</label>
+                            <input type="number" name="grid_rows" class="form-control" value="<?= (int) ($currentLab['grid_rows'] ?? 5) ?>" min="2" max="10">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <!-- Add Floor Modal -->
     <div class="modal fade" id="modalAddFloor" tabindex="-1">
         <div class="modal-dialog">
             <form method="POST" class="modal-content">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="add_floor">
+                <input type="hidden" name="selected_lab_id" value="<?= (int) $selectedLabId ?>">
+                <input type="hidden" name="selected_floor_id" value="<?= (int) $selectedFloorId ?>">
                 <div class="modal-header">
                     <h5 class="modal-title">Add New Floor</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -511,6 +696,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
             <form method="POST" class="modal-content">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="add_station">
+                <input type="hidden" name="selected_lab_id" value="<?= (int) $selectedLabId ?>">
+                <input type="hidden" name="selected_floor_id" value="<?= (int) $selectedFloorId ?>">
                 <div class="modal-header">
                     <h5 class="modal-title">Add Station</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -554,6 +741,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
             <form method="POST" class="modal-content">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="update_station">
+                <input type="hidden" name="selected_lab_id" value="<?= (int) $selectedLabId ?>">
+                <input type="hidden" name="selected_floor_id" value="<?= (int) $selectedFloorId ?>">
                 <input type="hidden" name="station_id" id="edit-id">
                 <div class="modal-header">
                     <h5 class="modal-title">Edit Station</h5>
@@ -575,7 +764,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Status</label>
+                        <label class="form-label">Manual Fallback Status</label>
                         <select name="status" id="edit-status" class="form-select">
                             <option value="offline">Offline</option>
                             <option value="idle">Idle</option>
@@ -606,6 +795,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+    let fallbackBackdrop = null;
+
+    function openModal(modalId) {
+        const modalEl = document.getElementById(modalId);
+        if (!modalEl) return;
+        if (window.bootstrap && bootstrap.Modal) {
+            new bootstrap.Modal(modalEl).show();
+            return;
+        }
+        modalEl.style.display = 'block';
+        modalEl.classList.add('show');
+        modalEl.setAttribute('aria-modal', 'true');
+        modalEl.removeAttribute('aria-hidden');
+        document.body.classList.add('modal-open');
+        if (!fallbackBackdrop) {
+            fallbackBackdrop = document.createElement('div');
+            fallbackBackdrop.className = 'modal-backdrop fade show';
+            fallbackBackdrop.addEventListener('click', closeOpenFallbackModals);
+        }
+        document.body.appendChild(fallbackBackdrop);
+    }
+
+    function closeOpenFallbackModals() {
+        document.querySelectorAll('.modal.show').forEach((modalEl) => {
+            modalEl.classList.remove('show');
+            modalEl.style.display = 'none';
+            modalEl.setAttribute('aria-hidden', 'true');
+            modalEl.removeAttribute('aria-modal');
+        });
+        document.body.classList.remove('modal-open');
+        if (fallbackBackdrop && fallbackBackdrop.parentNode) {
+            fallbackBackdrop.parentNode.removeChild(fallbackBackdrop);
+        }
+    }
+
     function editStation(s) {
         document.getElementById('edit-id').value = s.id;
         document.getElementById('edit-code').value = s.station_code;
@@ -615,8 +839,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
         document.getElementById('edit-hostname').value = s.hostname || '';
         document.getElementById('edit-ip').value = s.ip_address || '';
         document.getElementById('edit-mac').value = s.mac_address || '';
-        new bootstrap.Modal(document.getElementById('modalEditStation')).show();
+        openModal('modalEditStation');
     }
+
+    document.querySelectorAll('[data-bs-dismiss="modal"]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            if (!(window.bootstrap && bootstrap.Modal)) {
+                closeOpenFallbackModals();
+            }
+        });
+    });
 
     // Bulk selection
     document.getElementById('select-all')?.addEventListener('change', function() {

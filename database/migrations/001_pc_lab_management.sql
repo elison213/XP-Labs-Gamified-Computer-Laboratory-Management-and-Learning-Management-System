@@ -24,8 +24,6 @@ CREATE TABLE IF NOT EXISTS lab_pcs (
     config JSON NULL COMMENT 'PC-specific configuration',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (floor_id) REFERENCES lab_floors(id) ON DELETE SET NULL,
-    FOREIGN KEY (station_id) REFERENCES lab_stations(id) ON DELETE SET NULL,
     INDEX idx_hostname (hostname),
     INDEX idx_status (status),
     INDEX idx_heartbeat (last_heartbeat)
@@ -45,9 +43,6 @@ CREATE TABLE IF NOT EXISTS pc_sessions (
     status ENUM('active', 'completed', 'forced_logout', 'timeout') DEFAULT 'active',
     checkout_reason VARCHAR(100) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (pc_id) REFERENCES lab_pcs(id) ON DELETE CASCADE,
-    FOREIGN KEY (station_id) REFERENCES lab_stations(id) ON DELETE SET NULL,
     INDEX idx_user_status (user_id, status),
     INDEX idx_pc_status (pc_id, status),
     INDEX idx_checkin (checkin_time)
@@ -84,7 +79,6 @@ CREATE TABLE IF NOT EXISTS folder_access_rules (
     apply_to_group VARCHAR(100) NULL COMMENT 'Windows group name to apply permissions to',
     is_active TINYINT(1) DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (floor_id) REFERENCES lab_floors(id) ON DELETE SET NULL,
     INDEX idx_floor_role (floor_id, role),
     INDEX idx_role (role)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -104,8 +98,6 @@ CREATE TABLE IF NOT EXISTS remote_commands (
     executed_at DATETIME NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     expires_at DATETIME NULL COMMENT 'Command expires after this time',
-    FOREIGN KEY (pc_id) REFERENCES lab_pcs(id) ON DELETE CASCADE,
-    FOREIGN KEY (issued_by) REFERENCES users(id) ON DELETE CASCADE,
     INDEX idx_pc_status (pc_id, status),
     INDEX idx_status (status),
     INDEX idx_created (created_at)

@@ -12,6 +12,27 @@ Auth::requireRole(['admin', 'teacher']);
 $db = Database::getInstance();
 $role = $_SESSION['user_role'];
 $userId = Auth::id();
+$hasAllowLate = (int) $db->fetchOne(
+    "SELECT COUNT(*) FROM information_schema.columns
+     WHERE table_schema = DATABASE() AND table_name = 'assignments' AND column_name = 'allow_late'"
+) > 0;
+$hasLatePenalty = (int) $db->fetchOne(
+    "SELECT COUNT(*) FROM information_schema.columns
+     WHERE table_schema = DATABASE() AND table_name = 'assignments' AND column_name = 'late_penalty_percent'"
+) > 0;
+$hasIsActive = (int) $db->fetchOne(
+    "SELECT COUNT(*) FROM information_schema.columns
+     WHERE table_schema = DATABASE() AND table_name = 'assignments' AND column_name = 'is_active'"
+) > 0;
+
+if (!$hasAllowLate) {
+    $db->query("ALTER TABLE assignments ADD COLUMN allow_late TINYINT(1) NOT NULL DEFAULT 1 AFTER max_points");
+    $hasAllowLate = true;
+}
+if (!$hasLatePenalty) {
+    $db->query("ALTER TABLE assignments ADD COLUMN late_penalty_percent INT NOT NULL DEFAULT 10 AFTER allow_late");
+    $hasLatePenalty = true;
+}
 
 // Handle POST actions
 $message = null;
@@ -21,29 +42,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
     try {
         switch ($action) {
             case 'create':
-                $db->insert('assignments', [
+                $createData = [
                     'title' => $_POST['title'],
                     'description' => $_POST['description'] ?? '',
                     'course_id' => (int) ($_POST['course_id'] ?? 0),
                     'created_by' => $userId,
                     'due_date' => $_POST['due_date'] ?: null,
                     'max_points' => (int) ($_POST['max_points'] ?? 100),
-                    'allow_late' => !empty($_POST['allow_late']) ? 1 : 0,
-                    'late_penalty_percent' => (int) ($_POST['late_penalty_percent'] ?? 10),
-                    'is_active' => 1,
-                ]);
+                ];
+                if ($hasAllowLate) {
+                    $createData['allow_late'] = !empty($_POST['allow_late']) ? 1 : 0;
+                }
+                if ($hasLatePenalty) {
+                    $createData['late_penalty_percent'] = (int) ($_POST['late_penalty_percent'] ?? 10);
+                }
+                if ($hasIsActive) {
+                    $createData['is_active'] = 1;
+                }
+                $db->insert('assignments', $createData);
                 $message = ['type' => 'success', 'text' => 'Assignment created successfully'];
                 break;
             case 'update':
-                $db->update('assignments', [
+                $updateData = [
                     'title' => $_POST['title'],
                     'description' => $_POST['description'] ?? '',
                     'course_id' => (int) ($_POST['course_id'] ?? 0),
                     'due_date' => $_POST['due_date'] ?: null,
                     'max_points' => (int) ($_POST['max_points'] ?? 100),
-                    'allow_late' => !empty($_POST['allow_late']) ? 1 : 0,
-                    'late_penalty_percent' => (int) ($_POST['late_penalty_percent'] ?? 10),
-                ], 'id = ?', [(int) $_POST['assignment_id']]);
+                ];
+                if ($hasAllowLate) {
+                    $updateData['allow_late'] = !empty($_POST['allow_late']) ? 1 : 0;
+                }
+                if ($hasLatePenalty) {
+                    $updateData['late_penalty_percent'] = (int) ($_POST['late_penalty_percent'] ?? 10);
+                }
+                $db->update('assignments', $updateData, 'id = ?', [(int) $_POST['assignment_id']]);
                 $message = ['type' => 'success', 'text' => 'Assignment updated successfully'];
                 break;
             case 'delete':

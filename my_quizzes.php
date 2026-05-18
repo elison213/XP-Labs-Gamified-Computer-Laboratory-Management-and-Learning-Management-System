@@ -11,6 +11,12 @@ Auth::requireRole('student');
 
 $userId = Auth::id();
 $db = Database::getInstance();
+$hasAttemptIsPreview = (int) $db->fetchOne(
+    "SELECT COUNT(*) FROM information_schema.columns
+     WHERE table_schema = DATABASE()
+       AND table_name = 'quiz_attempts'
+       AND column_name = 'is_preview'"
+) > 0;
 
 // Get quizzes for courses the student is enrolled in (including finished ones for review)
 $availableQuizzes = $db->fetchAll(
@@ -36,7 +42,7 @@ $availableQuizzes = $db->fetchAll(
                 MAX(qa.id) as latest_attempt_id,
                 MAX(CASE WHEN qa.status <> 'in_progress' OR qa.finished_at IS NOT NULL THEN qa.id ELSE NULL END) as latest_reviewable_attempt_id
          FROM quiz_attempts qa
-         WHERE qa.user_id = ?
+         WHERE qa.user_id = ?" . ($hasAttemptIsPreview ? " AND COALESCE(qa.is_preview, 0) = 0" : "") . "
          GROUP BY qa.quiz_id, qa.user_id
      ) latest ON q.id = latest.quiz_id AND latest.user_id = ?
      LEFT JOIN (
@@ -165,6 +171,8 @@ $avgScore = $scoredCount > 0 ? round($totalScored / $scoredCount, 1) : 0;
         .quiz-meta { font-size: 0.85rem; color: var(--text-muted); }
         .text-muted { color: var(--text-muted) !important; }
         .score-display { font-weight: 700; color: var(--green); }
+
+        /* (powerup shop moved to powerup_shop.php) */
     </style>
 </head>
 <body>

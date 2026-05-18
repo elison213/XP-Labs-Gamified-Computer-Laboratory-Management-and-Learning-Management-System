@@ -12,7 +12,7 @@
         </a>
         
         <div class="nav-section">Learning</div>
-        <a href="courses.php" class="<?= basename($_SERVER['PHP_SELF']) === 'courses.php' ? 'active' : '' ?>">
+        <a href="courses.php" class="<?= in_array(basename($_SERVER['PHP_SELF'] ?? ''), ['courses.php', 'course_lesson.php'], true) ? 'active' : '' ?>">
             <i class="bi bi-journal-bookmark"></i> Courses
         </a>
         <a href="assignments.php" class="<?= basename($_SERVER['PHP_SELF']) === 'assignments.php' ? 'active' : '' ?>">
@@ -20,6 +20,9 @@
         </a>
         <a href="my_quizzes.php" class="<?= basename($_SERVER['PHP_SELF']) === 'my_quizzes.php' ? 'active' : '' ?>">
             <i class="bi bi-question-circle"></i> My Quizzes
+        </a>
+        <a href="powerup_shop.php" class="<?= basename($_SERVER['PHP_SELF']) === 'powerup_shop.php' ? 'active' : '' ?>">
+            <i class="bi bi-gem"></i> Powerup Shop
         </a>
         <a href="my_submissions.php" class="<?= basename($_SERVER['PHP_SELF']) === 'my_submissions.php' ? 'active' : '' ?>">
             <i class="bi bi-upload"></i> My Submissions

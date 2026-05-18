@@ -43,9 +43,10 @@ return [
         'peer_help' => 5,
     ],
 
-    // Door kiosk settings (QR scanning tablet)
+    // Door kiosk settings (QR scanning tablet / mobile browser)
     'kiosk' => [
-        // If non-empty, only these IPs can call /api/kiosk/* endpoints
+        // Mobile kiosks use X-Kiosk-Token from Lab Management (MAC is admin-entered; token is real auth).
+        // If non-empty, legacy LAN tablets may also call /api/kiosk/unlock from these IPs without a token.
         'allowed_ips' => [
             // e.g. '192.168.10.50',
         ],
@@ -53,6 +54,12 @@ return [
         // Used as remote_commands.issued_by (must be a valid users.id).
         // If left 0, the API will fall back to the first active admin user.
         'issued_by_user_id' => 0,
+    ],
+
+    // Lab PC Management dashboard (dashboard_lab_pcs.php)
+    'lab_dashboard' => [
+        'show_kiosk_ui' => false,
+        'show_auto_deploy_ui' => false,
     ],
 
     // Auto-deployment policy for lab agent rollout

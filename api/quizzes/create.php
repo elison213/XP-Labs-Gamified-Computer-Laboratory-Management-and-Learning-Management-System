@@ -62,6 +62,26 @@ try {
         'created_by' => Auth::id(),
     ]);
 
+    // Powerup rules (optional): allowed/banned + max uses per attempt per powerup
+    $powerupRules = $input['powerup_rules'] ?? null;
+    if (is_string($powerupRules)) {
+        $decoded = json_decode($powerupRules, true);
+        $powerupRules = is_array($decoded) ? $decoded : null;
+    }
+    if (is_array($powerupRules)) {
+        $quizService->setQuizPowerupRules($quizId, $powerupRules);
+    } else {
+        // Backward compatibility for older clients that only pass disabled IDs
+        $disabledIds = $input['disabled_powerup_ids'] ?? [];
+        if (is_string($disabledIds)) {
+            $decoded = json_decode($disabledIds, true);
+            $disabledIds = is_array($decoded) ? $decoded : [];
+        }
+        if (is_array($disabledIds)) {
+            $quizService->setQuizDisabledPowerups($quizId, $disabledIds);
+        }
+    }
+
     // Add questions if provided
     if (!empty($input['questions']) && is_array($input['questions'])) {
         $questionNumber = 1;

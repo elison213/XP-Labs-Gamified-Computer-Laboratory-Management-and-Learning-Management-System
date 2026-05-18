@@ -13,6 +13,12 @@ $db = Database::getInstance();
 $role = $_SESSION['user_role'];
 $userId = Auth::id();
 $quizId = (int) ($_GET['quiz_id'] ?? 0);
+$hasAttemptIsPreview = (int) $db->fetchOne(
+    "SELECT COUNT(*) FROM information_schema.columns
+     WHERE table_schema = DATABASE()
+       AND table_name = 'quiz_attempts'
+       AND column_name = 'is_preview'"
+) > 0;
 
 if (!$quizId) {
     header('Location: quizzes_manage.php');
@@ -46,23 +52,33 @@ $attempts = $db->fetchAll(
             END AS score_percentage
      FROM quiz_attempts qa
      JOIN users u ON qa.user_id = u.id
-     WHERE qa.quiz_id = ?
+     WHERE qa.quiz_id = ?" . ($hasAttemptIsPreview ? " AND COALESCE(qa.is_preview, 0) = 0" : "") . "
      ORDER BY score_percentage DESC, qa.finished_at DESC",
     [$quizId]
 );
 
-$questionAnalytics = $db->fetchAll(
-    "SELECT qq.id, qq.question_number, qq.question_text, qq.type,
-            COUNT(qa.id) AS total_answers,
-            SUM(CASE WHEN qa.is_correct = 1 THEN 1 ELSE 0 END) AS correct_answers,
-            SUM(CASE WHEN qa.is_correct = 0 THEN 1 ELSE 0 END) AS wrong_answers
-     FROM quiz_questions qq
-     LEFT JOIN quiz_answers qa ON qa.question_id = qq.id
-     WHERE qq.quiz_id = ?
-     GROUP BY qq.id
-     ORDER BY qq.question_number ASC",
-    [$quizId]
-);
+$questionAnalyticsSql = $hasAttemptIsPreview
+    ? "SELECT qq.id, qq.question_number, qq.question_text, qq.type,
+              COUNT(CASE WHEN COALESCE(qatt.is_preview, 0) = 0 THEN qa.id ELSE NULL END) AS total_answers,
+              SUM(CASE WHEN COALESCE(qatt.is_preview, 0) = 0 AND qa.is_correct = 1 THEN 1 ELSE 0 END) AS correct_answers,
+              SUM(CASE WHEN COALESCE(qatt.is_preview, 0) = 0 AND qa.is_correct = 0 THEN 1 ELSE 0 END) AS wrong_answers
+       FROM quiz_questions qq
+       LEFT JOIN quiz_answers qa ON qa.question_id = qq.id
+       LEFT JOIN quiz_attempts qatt ON qatt.id = qa.attempt_id
+       WHERE qq.quiz_id = ?
+       GROUP BY qq.id
+       ORDER BY qq.question_number ASC"
+    : "SELECT qq.id, qq.question_number, qq.question_text, qq.type,
+              COUNT(qa.id) AS total_answers,
+              SUM(CASE WHEN qa.is_correct = 1 THEN 1 ELSE 0 END) AS correct_answers,
+              SUM(CASE WHEN qa.is_correct = 0 THEN 1 ELSE 0 END) AS wrong_answers
+       FROM quiz_questions qq
+       LEFT JOIN quiz_answers qa ON qa.question_id = qq.id
+       LEFT JOIN quiz_attempts qatt ON qatt.id = qa.attempt_id
+       WHERE qq.quiz_id = ?
+       GROUP BY qq.id
+       ORDER BY qq.question_number ASC";
+$questionAnalytics = $db->fetchAll($questionAnalyticsSql, [$quizId]);
 
 $attemptIds = array_map(fn($a) => (int) $a['id'], $attempts);
 $answersByAttempt = [];

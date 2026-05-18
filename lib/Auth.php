@@ -5,6 +5,9 @@
 
 namespace XPLabs\Lib;
 
+require_once __DIR__ . '/autoload.php';
+require_once __DIR__ . '/Database.php';
+
 class Auth
 {
     private static ?Auth $instance = null;
@@ -73,6 +76,16 @@ class Auth
         // Update last login
         $db->query("UPDATE users SET last_login = NOW() WHERE id = ?", [$userId]);
 
+        try {
+            $log = new \XPLabs\Services\AdminLogService();
+            $log->log('login', 'user', $userId, [
+                'lrn' => $user['lrn'] ?? '',
+                'role' => $user['role'] ?? $role,
+            ], $userId);
+        } catch (\Throwable $e) {
+            // non-fatal
+        }
+
         $this->user = $user;
         return true;
     }
@@ -83,6 +96,14 @@ class Auth
     public function logout(): void
     {
         $this->initSession();
+
+        $logoutUserId = $_SESSION['user_id'] ?? null;
+        if ($logoutUserId) {
+            try {
+                (new \XPLabs\Services\AdminLogService())->log('logout', 'user', (int) $logoutUserId, null, (int) $logoutUserId);
+            } catch (\Throwable $e) {
+            }
+        }
 
         $_SESSION = [];
 

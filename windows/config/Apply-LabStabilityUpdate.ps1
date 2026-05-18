@@ -11,6 +11,14 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+function Assert-CompatibleOs {
+  $os = Get-CimInstance Win32_OperatingSystem
+  $caption = [string]$os.Caption
+  if ($caption -notmatch 'Windows Server 2022|Windows Server 2025|Windows Server 2019') {
+    Write-Warning "This script is intended for Windows Server 2019/2022/2025. Detected: $caption"
+  }
+}
+
 function Assert-Admin {
   $id = [Security.Principal.WindowsIdentity]::GetCurrent()
   $p = New-Object Security.Principal.WindowsPrincipal($id)
@@ -55,6 +63,7 @@ function Ensure-ServiceRunning([string]$ServiceName) {
 }
 
 Assert-Admin
+Assert-CompatibleOs
 $ProjectPath = Resolve-ProjectPath -InputPath $ProjectPath
 
 $phpExe = Get-PhpExe -XamppRoot $XamppPath
@@ -98,13 +107,19 @@ if (-not $SkipServiceRestart) {
 
 Write-Host "Restarting XPLabs agent task if present..." -ForegroundColor Cyan
 try {
-  $task = Get-ScheduledTask -TaskName "XPLabs-AgentLoop" -ErrorAction SilentlyContinue
-  if ($task) {
-    Stop-ScheduledTask -TaskName "XPLabs-AgentLoop" -ErrorAction SilentlyContinue | Out-Null
-    Start-ScheduledTask -TaskName "XPLabs-AgentLoop" | Out-Null
-    Write-Host "Task restarted: XPLabs-AgentLoop" -ForegroundColor Green
-  } else {
-    Write-Host "Task XPLabs-AgentLoop not found. Skipping." -ForegroundColor Yellow
+  $taskNames = @("XPLabsAgentLoop", "XPLabs-AgentLoop")
+  $restarted = $false
+  foreach ($taskName in $taskNames) {
+    $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+    if ($task) {
+      Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue | Out-Null
+      Start-ScheduledTask -TaskName $taskName | Out-Null
+      Write-Host "Task restarted: $taskName" -ForegroundColor Green
+      $restarted = $true
+    }
+  }
+  if (-not $restarted) {
+    Write-Host "No XPLabs agent task found. Skipping task restart." -ForegroundColor Yellow
   }
 } catch {
   Write-Host "Could not restart XPLabs-AgentLoop task: $($_.Exception.Message)" -ForegroundColor Yellow

@@ -52,6 +52,9 @@ $isAdmin = ($currentRole === 'admin');
         <a href="lab_seatplan.php" class="<?= $currentPage === 'lab_seatplan.php' ? 'active' : '' ?>">
             <i class="bi bi-layout-text-window-reverse"></i> Seat Plan
         </a>
+        <a href="dashboard_lab_pcs.php" class="<?= $currentPage === 'dashboard_lab_pcs.php' ? 'active' : '' ?>">
+            <i class="bi bi-pc-display-horizontal"></i> Lab Management
+        </a>
         
         <?php if ($isAdmin): ?>
         <div class="nav-section">Management</div>
@@ -60,9 +63,6 @@ $isAdmin = ($currentRole === 'admin');
         </a>
         <a href="admin_system.php" class="<?= $currentPage === 'admin_system.php' ? 'active' : '' ?>">
             <i class="bi bi-gear"></i> Lab Settings
-        </a>
-        <a href="inventory.php" class="<?= $currentPage === 'inventory.php' ? 'active' : '' ?>">
-            <i class="bi bi-box-seam"></i> Inventory
         </a>
         <a href="incidents.php" class="<?= $currentPage === 'incidents.php' ? 'active' : '' ?>">
             <i class="bi bi-exclamation-triangle"></i> Incidents
@@ -73,7 +73,7 @@ $isAdmin = ($currentRole === 'admin');
         <?php endif; ?>
         
         <div class="nav-section">Academic</div>
-        <a href="courses.php" class="<?= $currentPage === 'courses.php' ? 'active' : '' ?>">
+        <a href="courses.php" class="<?= in_array($currentPage, ['courses.php', 'course_lesson.php'], true) ? 'active' : '' ?>">
             <i class="bi bi-journal-bookmark"></i> Courses
         </a>
         <a href="assignments_manage.php" class="<?= $currentPage === 'assignments_manage.php' ? 'active' : '' ?>">
@@ -101,6 +101,11 @@ $isAdmin = ($currentRole === 'admin');
         <a href="leaderboard.php" class="<?= $currentPage === 'leaderboard.php' ? 'active' : '' ?>">
             <i class="bi bi-trophy"></i> Leaderboard
         </a>
+        <?php if ($isAdmin): ?>
+        <a href="admin_powerup_shop.php" class="<?= $currentPage === 'admin_powerup_shop.php' ? 'active' : '' ?>">
+            <i class="bi bi-gem"></i> Powerup Shop
+        </a>
+        <?php endif; ?>
         
         <?php if ($isAdmin): ?>
         <div class="nav-section">System</div>

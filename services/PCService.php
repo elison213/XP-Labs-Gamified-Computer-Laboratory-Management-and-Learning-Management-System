@@ -368,6 +368,10 @@ class PCService
             $cursor = 0;
         }
 
+        if (!$this->db->tableExists('pc_heartbeat_receipts')) {
+            return $this->processHeartbeatDeliveryLegacy($pc, $input, $heartbeatId, $protocolVersion);
+        }
+
         $existing = $this->db->fetch(
             "SELECT id, response_json FROM pc_heartbeat_receipts WHERE pc_id = ? AND heartbeat_id = ? LIMIT 1",
             [$pcId, $heartbeatId]
@@ -447,12 +451,12 @@ class PCService
         $ackId = (int) $this->db->insert('pc_heartbeat_receipts', [
             'pc_id' => $pcId,
             'heartbeat_id' => $heartbeatId,
-            'command_cursor' => $nextCursor,
+            'command_cursor' => $cursor,
             'response_json' => $responseJson ?: '{}',
         ]);
+        // Do not advance lab_pcs.last_command_cursor on heartbeat delivery alone — only on command ack (POST /api/pc/commands.php).
         $this->db->update('lab_pcs', [
             'last_heartbeat_ack_id' => $ackId,
-            'last_command_cursor' => $nextCursor,
         ], 'id = ?', [$pcId]);
         $responsePayload['ack_id'] = $ackId;
 
@@ -472,6 +476,66 @@ class PCService
         $this->pruneProtocolDebugEvents();
 
         return $responsePayload;
+    }
+
+    /**
+     * Heartbeat without receipt dedup table (migration 049 not applied).
+     */
+    private function processHeartbeatDeliveryLegacy(array $pc, array $input, string $heartbeatId, string $protocolVersion): array
+    {
+        $pcId = (int) ($pc['id'] ?? 0);
+        $status = strtolower(trim((string) ($input['status'] ?? 'online')));
+        $systemInfo = $input['system_info'] ?? null;
+        $cursor = max(0, (int) ($input['command_cursor'] ?? 0));
+
+        $this->updateHeartbeat($pcId);
+        if (in_array($status, ['online', 'idle', 'locked', 'maintenance'], true)) {
+            $this->updatePCStatus($pcId, $status);
+        }
+        if ($systemInfo !== null) {
+            $config = json_decode((string) ($pc['config'] ?? '{}'), true) ?: [];
+            $config['last_system_info'] = $systemInfo;
+            $config['last_heartbeat_data'] = $input;
+            $this->db->update('lab_pcs', ['config' => json_encode($config)], 'id = ?', [$pcId]);
+        }
+
+        $pendingCommands = $this->getPendingCommandsAfterCursor($pcId, $cursor);
+        $activeSession = $this->getActiveSession($pcId);
+        $nextCursor = $cursor;
+        foreach ($pendingCommands as $cmd) {
+            $cid = (int) ($cmd['id'] ?? 0);
+            if ($cid > $nextCursor) {
+                $nextCursor = $cid;
+            }
+        }
+
+        return [
+            'success' => true,
+            'pc_id' => $pcId,
+            'hostname' => (string) ($pc['hostname'] ?? ''),
+            'duplicate' => false,
+            'legacy_mode' => true,
+            'retry_after_sec' => 5,
+            'command_cursor' => $nextCursor,
+            'commands' => array_map(function ($cmd) {
+                return [
+                    'id' => (int) $cmd['id'],
+                    'type' => $cmd['command_type'],
+                    'params' => $cmd['params'] ? json_decode($cmd['params'], true) : null,
+                    'issued_at' => $cmd['created_at'],
+                    'expires_at' => $cmd['expires_at'],
+                ];
+            }, $pendingCommands),
+            'active_session' => $activeSession ? [
+                'session_id' => (int) $activeSession['id'],
+                'user_id' => (int) $activeSession['user_id'],
+                'user_name' => trim((string) $activeSession['first_name'] . ' ' . (string) $activeSession['last_name']),
+                'lrn' => (string) $activeSession['lrn'],
+                'checkin_time' => (string) $activeSession['checkin_time'],
+            ] : null,
+            'server_time' => date('Y-m-d H:i:s'),
+            'ack_id' => 0,
+        ];
     }
 
     private function trimHeartbeatReceipts(int $pcId, int $keep): void
@@ -1161,6 +1225,48 @@ class PCService
         return ['valid' => true, 'user' => $user, 'pc' => $pc];
     }
 
+    /**
+     * Validate student lockscreen login (allows agent-locked PCs; blocks maintenance).
+     */
+    public function validateStudentLabLogin(int $userId, int $pcId): array
+    {
+        $user = $this->db->fetch("SELECT * FROM users WHERE id = ? AND is_active = 1", [$userId]);
+        if (!$user) {
+            return ['valid' => false, 'error' => 'User not found or inactive'];
+        }
+        if (($user['role'] ?? '') !== 'student') {
+            return ['valid' => false, 'error' => 'Only students can sign in here'];
+        }
+
+        $pc = $this->getPCById($pcId);
+        if (!$pc) {
+            return ['valid' => false, 'error' => 'PC not found'];
+        }
+
+        if ($pc['status'] === 'maintenance') {
+            return ['valid' => false, 'error' => 'PC is in maintenance'];
+        }
+
+        $existingSession = $this->getUserActiveSession($userId);
+        if ($existingSession) {
+            return [
+                'valid' => false,
+                'error' => 'You already have an active session',
+                'existing_pc' => $existingSession['hostname'],
+            ];
+        }
+
+        $pcExisting = $this->db->fetch(
+            "SELECT id FROM pc_sessions WHERE pc_id = ? AND status = 'active'",
+            [$pcId]
+        );
+        if ($pcExisting) {
+            return ['valid' => false, 'error' => 'This PC already has an active session'];
+        }
+
+        return ['valid' => true, 'user' => $user, 'pc' => $pc];
+    }
+
     // =====================================================
     // Remote Commands
     // =====================================================
@@ -1168,8 +1274,45 @@ class PCService
     /**
      * Queue a remote command for a PC.
      */
+    /**
+     * Resolve a valid users.id for remote_commands.issued_by (FK).
+     */
+    public function resolveIssuedByUserId(int $preferred = 0): int
+    {
+        if ($preferred > 0) {
+            $row = $this->db->fetch(
+                "SELECT id FROM users WHERE id = ? AND is_active = 1 LIMIT 1",
+                [$preferred]
+            );
+            if ($row) {
+                return (int) $row['id'];
+            }
+        }
+
+        $admin = $this->db->fetch(
+            "SELECT id FROM users WHERE role = 'admin' AND is_active = 1 ORDER BY id ASC LIMIT 1"
+        );
+        if ($admin) {
+            return (int) $admin['id'];
+        }
+
+        $teacher = $this->db->fetch(
+            "SELECT id FROM users WHERE role = 'teacher' AND is_active = 1 ORDER BY id ASC LIMIT 1"
+        );
+        if ($teacher) {
+            return (int) $teacher['id'];
+        }
+
+        return 0;
+    }
+
     public function queueCommand(int $pcId, int $issuedBy, string $commandType, ?array $params = null, int $ttlSeconds = 300): array
     {
+        $issuedBy = $this->resolveIssuedByUserId($issuedBy);
+        if ($issuedBy <= 0) {
+            return ['success' => false, 'error' => 'No valid issued_by user'];
+        }
+
         $allowed = ['lock', 'unlock', 'shutdown', 'restart', 'message', 'screenshot'];
         if (!in_array($commandType, $allowed)) {
             return ['success' => false, 'error' => 'Invalid command type'];
@@ -1208,14 +1351,19 @@ class PCService
 
     public function getPendingCommandsAfterCursor(int $pcId, int $afterCursor = 0): array
     {
+        // Deliver all pending commands. Filtering with id > cursor stranded commands when the
+        // agent's local cursor ran ahead of the server (e.g. after queue reset or failed ack).
+        // The agent dedupes with last_command_cursor and idempotent lock/unlock handlers.
+        unset($afterCursor);
+
         return $this->db->fetchAll(
             "SELECT * FROM remote_commands
              WHERE pc_id = ?
-               AND id > ?
                AND status = 'pending'
                AND (expires_at IS NULL OR expires_at > NOW())
-             ORDER BY id ASC",
-            [$pcId, $afterCursor]
+             ORDER BY id ASC
+             LIMIT 50",
+            [$pcId]
         );
     }
 
