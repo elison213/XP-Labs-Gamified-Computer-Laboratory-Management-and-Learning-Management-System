@@ -6,8 +6,6 @@ require_once __DIR__ . '/includes/bootstrap.php';
 
 use XPLabs\Lib\Auth;
 use XPLabs\Lib\Database;
-use XPLabs\Lib\PasswordPolicy;
-use XPLabs\Services\AdminLogService;
 use XPLabs\Services\UserService;
 
 Auth::requireRole('admin');
@@ -15,23 +13,13 @@ Auth::requireRole('admin');
 $userService = new UserService();
 $db = Database::getInstance();
 $page = max(1, (int) ($_GET['page'] ?? 1));
-$search = trim((string) ($_GET['search'] ?? ''));
-$roleFilter = (string) ($_GET['role'] ?? '');
-$sectionFilter = trim((string) ($_GET['section'] ?? ''));
-$gradeFilter = trim((string) ($_GET['grade_level'] ?? ''));
-$statusFilter = (string) ($_GET['status'] ?? '');
+$search = $_GET['search'] ?? '';
+$roleFilter = $_GET['role'] ?? '';
 
 $filters = [
     'search' => $search,
     'role' => $roleFilter,
-    'section' => $sectionFilter,
-    'grade_level' => $gradeFilter,
 ];
-if ($statusFilter === 'active') {
-    $filters['is_active'] = 1;
-} elseif ($statusFilter === 'inactive') {
-    $filters['is_active'] = 0;
-}
 
 $users = $userService->list($filters, $page);
 
@@ -43,94 +31,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
     try {
         switch ($action) {
             case 'create':
-                $newRole = $_POST['role'] ?? 'student';
-                $payload = [
+                $userService->create([
                     'lrn' => $_POST['lrn'],
                     'first_name' => $_POST['first_name'],
                     'last_name' => $_POST['last_name'],
                     'email' => $_POST['email'] ?? null,
-                    'role' => $newRole,
-                ];
-                if ($newRole === 'teacher' || $newRole === 'admin') {
-                    $pw = (string) ($_POST['password'] ?? '');
-                    $pw2 = (string) ($_POST['password_confirm'] ?? '');
-                    if ($pw !== $pw2) {
-                        throw new \RuntimeException('Password and confirmation do not match.');
-                    }
-                    $payload['password'] = $pw;
-                }
-                if ($newRole === 'student') {
-                    $custom = trim((string) ($_POST['section_custom'] ?? ''));
-                    $presetId = (int) ($_POST['section_preset_id'] ?? 0);
-                    $section = '';
-                    if ($custom !== '') {
-                        $section = $custom;
-                    } elseif ($presetId > 0 && $db->tableExists('section_presets')) {
-                        $preset = $db->fetch('SELECT name FROM section_presets WHERE id = ? AND is_active = 1', [$presetId]);
-                        $section = $preset['name'] ?? '';
-                    }
-                    if ($section !== '') {
-                        $payload['section'] = $section;
-                    }
-                    $gl = trim((string) ($_POST['grade_level'] ?? ''));
-                    if ($gl !== '') {
-                        $payload['grade_level'] = $gl;
-                    }
-                }
-                $newId = $userService->create($payload);
-                (new AdminLogService())->log('create_user', 'user', (int) $newId, ['lrn' => $payload['lrn'], 'role' => $newRole]);
+                    'role' => $_POST['role'],
+                ]);
                 $message = ['type' => 'success', 'text' => 'User created successfully'];
                 break;
             case 'update':
-                $upd = [
+                $userService->update((int) $_POST['user_id'], [
                     'first_name' => $_POST['first_name'],
                     'last_name' => $_POST['last_name'],
                     'email' => $_POST['email'],
                     'role' => $_POST['role'],
                     'is_active' => isset($_POST['is_active']) ? 1 : 0,
-                ];
-                if (($_POST['role'] ?? '') === 'student') {
-                    $upd['section'] = $_POST['section'] ?? '';
-                    $upd['grade_level'] = $_POST['grade_level'] ?? '';
-                }
-                $uid = (int) $_POST['user_id'];
-                $userService->update($uid, $upd);
-                (new AdminLogService())->log('update_user', 'user', $uid, ['role' => $upd['role'] ?? '']);
+                ]);
                 $message = ['type' => 'success', 'text' => 'User updated successfully'];
                 break;
             case 'delete':
-                $uid = (int) $_POST['user_id'];
-                $userService->delete($uid);
-                (new AdminLogService())->log('delete_user', 'user', $uid);
+                $userService->delete((int) $_POST['user_id']);
                 $message = ['type' => 'success', 'text' => 'User deleted successfully'];
-                break;
-            case 'reset_password':
-                $uid = (int) ($_POST['user_id'] ?? 0);
-                $pw = (string) ($_POST['password'] ?? '');
-                $pw2 = (string) ($_POST['password_confirm'] ?? '');
-                if ($pw !== $pw2) {
-                    throw new \RuntimeException('Password and confirmation do not match.');
-                }
-                $target = $db->fetch('SELECT id, lrn, role, first_name, last_name FROM users WHERE id = ?', [$uid]);
-                if (!$target) {
-                    throw new \RuntimeException('User not found.');
-                }
-                $enforcePolicy = in_array($target['role'] ?? '', ['teacher', 'admin'], true)
-                    || !empty($_POST['enforce_policy']);
-                $userService->setPassword($uid, $pw, $enforcePolicy);
-                $message = ['type' => 'success', 'text' => 'Password updated for ' . ($target['first_name'] ?? '') . ' ' . ($target['last_name'] ?? '')];
                 break;
             case 'import':
                 if (isset($_FILES['csv_file']) && $_FILES['csv_file']['error'] === UPLOAD_ERR_OK) {
                     $role = $_POST['role'] ?? 'student';
-                    $format = $_POST['import_format'] ?? 'legacy';
-                    $tmp = $_FILES['csv_file']['tmp_name'];
-                    $orig = (string) ($_FILES['csv_file']['name'] ?? '');
-                    if ($format === 'masterlist') {
-                        $results = $userService->importFromMasterlistUpload($tmp, $orig, $role);
-                    } else {
-                        $results = $userService->importFromFile($tmp, $role);
-                    }
+                    $results = $userService->importFromFile($_FILES['csv_file']['tmp_name'], $role);
                     $message = ['type' => 'success', 'text' => "Import complete: {$results['success']} added, {$results['duplicate']} duplicates, {$results['error']} errors"];
                     if (!empty($results['errors'])) {
                         $message['text'] .= '. Errors: ' . implode(', ', array_slice($results['errors'], 0, 5));
@@ -138,49 +65,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
                 } else {
                     $message = ['type' => 'danger', 'text' => 'File upload error'];
                 }
-                break;
-            case 'section_preset_create':
-                if (!$db->tableExists('section_presets')) {
-                    throw new \RuntimeException('Section presets are not available.');
-                }
-                $pname = trim((string) ($_POST['preset_name'] ?? ''));
-                if ($pname === '') {
-                    throw new \RuntimeException('Preset name is required.');
-                }
-                $sort = (int) ($_POST['preset_sort_order'] ?? 0);
-                $db->insert('section_presets', [
-                    'name' => $pname,
-                    'sort_order' => $sort,
-                    'is_active' => 1,
-                ]);
-                $message = ['type' => 'success', 'text' => 'Section preset added'];
-                break;
-            case 'section_preset_update':
-                if (!$db->tableExists('section_presets')) {
-                    throw new \RuntimeException('Section presets are not available.');
-                }
-                $pid = (int) ($_POST['preset_id'] ?? 0);
-                $pname = trim((string) ($_POST['preset_name'] ?? ''));
-                if ($pid <= 0 || $pname === '') {
-                    throw new \RuntimeException('Invalid preset.');
-                }
-                $db->update('section_presets', [
-                    'name' => $pname,
-                    'sort_order' => (int) ($_POST['preset_sort_order'] ?? 0),
-                    'is_active' => isset($_POST['preset_is_active']) ? 1 : 0,
-                ], 'id = ?', [$pid]);
-                $message = ['type' => 'success', 'text' => 'Section preset updated'];
-                break;
-            case 'section_preset_delete':
-                if (!$db->tableExists('section_presets')) {
-                    throw new \RuntimeException('Section presets are not available.');
-                }
-                $pid = (int) ($_POST['preset_id'] ?? 0);
-                if ($pid <= 0) {
-                    throw new \RuntimeException('Invalid preset.');
-                }
-                $db->delete('section_presets', 'id = ?', [$pid]);
-                $message = ['type' => 'success', 'text' => 'Section preset removed'];
                 break;
             case 'enroll_student_course':
                 $studentId = (int) ($_POST['user_id'] ?? 0);
@@ -233,36 +117,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
 
     // Refresh data
     $users = $userService->list($filters, $page);
-    $sectionPresets = $db->tableExists('section_presets')
-        ? $db->fetchAll('SELECT id, name, sort_order, is_active FROM section_presets ORDER BY sort_order ASC, name ASC')
-        : [];
 }
 
 $activeCourses = $db->fetchAll(
     "SELECT id, code, name FROM courses WHERE status = 'active' ORDER BY name"
 );
-
-$sectionPresets = $db->tableExists('section_presets')
-    ? $db->fetchAll('SELECT id, name, sort_order, is_active FROM section_presets ORDER BY sort_order ASC, name ASC')
-    : [];
-$sectionOptions = $userService->getDistinctSections();
-$gradeOptions = $userService->getDistinctGradeLevels();
-$passwordRequirements = PasswordPolicy::requirements();
-$hasActiveFilters = $search !== '' || $roleFilter !== '' || $sectionFilter !== '' || $gradeFilter !== '' || $statusFilter !== '';
-
-function admin_users_query_string(array $overrides = []): string
-{
-    $params = array_merge([
-        'search' => $_GET['search'] ?? '',
-        'role' => $_GET['role'] ?? '',
-        'section' => $_GET['section'] ?? '',
-        'grade_level' => $_GET['grade_level'] ?? '',
-        'status' => $_GET['status'] ?? '',
-        'page' => $_GET['page'] ?? 1,
-    ], $overrides);
-    $params = array_filter($params, static fn ($v) => $v !== '' && $v !== null);
-    return $params ? ('?' . http_build_query($params)) : '';
-}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -346,34 +205,6 @@ function admin_users_query_string(array $overrides = []): string
         .pagination .page-item.active .page-link {
             background: var(--accent); border-color: var(--accent);
         }
-
-        .filter-panel .form-label {
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-            margin-bottom: 0.25rem;
-        }
-        .filter-hint {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-        }
-        .active-filter-chips {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-        }
-        .active-filter-chips .badge {
-            font-weight: 500;
-            padding: 0.4rem 0.65rem;
-        }
-        .password-rules {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            margin: 0;
-            padding-left: 1.1rem;
-        }
-        .password-rules li { margin-bottom: 0.2rem; }
     </style>
 </head>
 <body>
@@ -389,7 +220,7 @@ function admin_users_query_string(array $overrides = []): string
                     <i class="bi bi-plus-lg me-1"></i> Add User
                 </button>
                 <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#modalImport">
-                    <i class="bi bi-upload me-1"></i> Import
+                    <i class="bi bi-upload me-1"></i> Import CSV
                 </button>
             </div>
         </div>
@@ -401,133 +232,28 @@ function admin_users_query_string(array $overrides = []): string
         </div>
         <?php endif; ?>
 
-        <?php if ($db->tableExists('section_presets')): ?>
-        <div class="xp-card mb-4">
-            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <h5 class="mb-0"><i class="bi bi-collection me-2"></i>Section presets</h5>
-                <small class="text-muted">Used when creating students</small>
-            </div>
-            <div class="card-body">
-                <form method="POST" class="row g-2 align-items-end mb-4">
-                    <?= csrf_field() ?>
-                    <input type="hidden" name="action" value="section_preset_create">
-                    <div class="col-md-4">
-                        <label class="form-label">New preset name</label>
-                        <input type="text" name="preset_name" class="form-control" placeholder="e.g., Newton" required>
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label">Sort order</label>
-                        <input type="number" name="preset_sort_order" class="form-control" value="0">
-                    </div>
-                    <div class="col-md-2">
-                        <button type="submit" class="btn btn-primary w-100">Add preset</button>
-                    </div>
-                </form>
-                <?php if (empty($sectionPresets)): ?>
-                    <p class="text-muted mb-0 small">No presets yet. Add one above or import students with sections.</p>
-                <?php else: ?>
-                    <?php foreach ($sectionPresets as $preset): ?>
-                    <div class="border rounded p-2 mb-2 d-flex flex-wrap align-items-center gap-2">
-                        <form method="POST" class="row g-2 align-items-center flex-grow-1">
-                            <?= csrf_field() ?>
-                            <input type="hidden" name="action" value="section_preset_update">
-                            <input type="hidden" name="preset_id" value="<?= (int) $preset['id'] ?>">
-                            <div class="col-md-4">
-                                <input type="text" name="preset_name" class="form-control form-control-sm" value="<?= e($preset['name']) ?>" required>
-                            </div>
-                            <div class="col-md-2">
-                                <input type="number" name="preset_sort_order" class="form-control form-control-sm" value="<?= (int) $preset['sort_order'] ?>">
-                            </div>
-                            <div class="col-md-2">
-                                <div class="form-check mb-0">
-                                    <input class="form-check-input" type="checkbox" name="preset_is_active" value="1" id="pa<?= (int) $preset['id'] ?>" <?= (int) $preset['is_active'] ? 'checked' : '' ?>>
-                                    <label class="form-check-label small" for="pa<?= (int) $preset['id'] ?>">Active</label>
-                                </div>
-                            </div>
-                            <div class="col-md-2">
-                                <button type="submit" class="btn btn-sm btn-outline-primary">Save</button>
-                            </div>
-                        </form>
-                        <form method="POST" class="mb-0" onsubmit="return confirm('Delete this preset?');">
-                            <?= csrf_field() ?>
-                            <input type="hidden" name="action" value="section_preset_delete">
-                            <input type="hidden" name="preset_id" value="<?= (int) $preset['id'] ?>">
-                            <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-                        </form>
-                    </div>
-                    <?php endforeach; ?>
-                <?php endif; ?>
-            </div>
-        </div>
-        <?php endif; ?>
-
         <!-- Filters -->
-        <div class="xp-card mb-4 filter-panel">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-funnel me-2"></i>Find users</h5>
-            </div>
+        <div class="xp-card mb-4">
             <div class="card-body">
-                <p class="filter-hint mb-3">
-                    Choose filters below, then click <strong>Apply filters</strong>.
-                    For one class, set <strong>Role</strong> to Student and pick a <strong>Section</strong>.
-                </p>
-                <form method="GET" class="row g-3 align-items-end" id="user-filter-form">
+                <form method="GET" class="row g-2">
                     <div class="col-md-4">
-                        <label class="form-label" for="filter-search">Search</label>
-                        <input type="text" id="filter-search" name="search" class="form-control" placeholder="Name, LRN, or email" value="<?= e($search) ?>">
+                        <input type="text" name="search" class="form-control" placeholder="Search by name or LRN..." value="<?= e($search) ?>">
                     </div>
                     <div class="col-md-2">
-                        <label class="form-label" for="filter-role">Role</label>
-                        <select id="filter-role" name="role" class="form-select">
-                            <option value="">All roles</option>
+                        <select name="role" class="form-select">
+                            <option value="">All Roles</option>
                             <option value="student" <?= $roleFilter === 'student' ? 'selected' : '' ?>>Student</option>
                             <option value="teacher" <?= $roleFilter === 'teacher' ? 'selected' : '' ?>>Teacher</option>
                             <option value="admin" <?= $roleFilter === 'admin' ? 'selected' : '' ?>>Admin</option>
                         </select>
                     </div>
                     <div class="col-md-2">
-                        <label class="form-label" for="filter-section">Section</label>
-                        <select id="filter-section" name="section" class="form-select">
-                            <option value="">All sections</option>
-                            <?php foreach ($sectionOptions as $sec): ?>
-                            <option value="<?= e($sec) ?>" <?= $sectionFilter === $sec ? 'selected' : '' ?>><?= e($sec) ?></option>
-                            <?php endforeach; ?>
-                        </select>
+                        <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search me-1"></i> Filter</button>
                     </div>
                     <div class="col-md-2">
-                        <label class="form-label" for="filter-grade">Grade</label>
-                        <select id="filter-grade" name="grade_level" class="form-select">
-                            <option value="">All grades</option>
-                            <?php foreach ($gradeOptions as $gl): ?>
-                            <option value="<?= e($gl) ?>" <?= $gradeFilter === $gl ? 'selected' : '' ?>><?= e($gl) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label" for="filter-status">Status</label>
-                        <select id="filter-status" name="status" class="form-select">
-                            <option value="">Any status</option>
-                            <option value="active" <?= $statusFilter === 'active' ? 'selected' : '' ?>>Active only</option>
-                            <option value="inactive" <?= $statusFilter === 'inactive' ? 'selected' : '' ?>>Inactive only</option>
-                        </select>
-                    </div>
-                    <div class="col-12 d-flex flex-wrap gap-2 pt-1">
-                        <button type="submit" class="btn btn-primary"><i class="bi bi-funnel me-1"></i> Apply filters</button>
-                        <?php if ($hasActiveFilters): ?>
-                        <a href="admin_users.php" class="btn btn-outline-secondary">Clear all</a>
-                        <?php endif; ?>
+                        <a href="admin_users.php" class="btn btn-outline-secondary w-100">Clear</a>
                     </div>
                 </form>
-                <?php if ($hasActiveFilters): ?>
-                <div class="active-filter-chips mt-3 pt-3 border-top">
-                    <span class="text-muted small me-1">Active:</span>
-                    <?php if ($search !== ''): ?><span class="badge text-bg-primary">Search: <?= e($search) ?></span><?php endif; ?>
-                    <?php if ($roleFilter !== ''): ?><span class="badge text-bg-secondary">Role: <?= e(ucfirst($roleFilter)) ?></span><?php endif; ?>
-                    <?php if ($sectionFilter !== ''): ?><span class="badge text-bg-info">Section: <?= e($sectionFilter) ?></span><?php endif; ?>
-                    <?php if ($gradeFilter !== ''): ?><span class="badge text-bg-info">Grade: <?= e($gradeFilter) ?></span><?php endif; ?>
-                    <?php if ($statusFilter !== ''): ?><span class="badge text-bg-warning text-dark">Status: <?= e(ucfirst($statusFilter)) ?></span><?php endif; ?>
-                </div>
-                <?php endif; ?>
             </div>
         </div>
 
@@ -546,7 +272,6 @@ function admin_users_query_string(array $overrides = []): string
                                 <th>Name</th>
                                 <th>Email</th>
                                 <th>Role</th>
-                                <th>Section</th>
                                 <th>Status</th>
                                 <th>Course</th>
                                 <th>Last Login</th>
@@ -562,7 +287,6 @@ function admin_users_query_string(array $overrides = []): string
                                 </td>
                                 <td><?= e($user['email'] ?? '—') ?></td>
                                 <td><span class="role-badge <?= $user['role'] ?>"><?= ucfirst($user['role']) ?></span></td>
-                                <td class="small"><?= $user['role'] === 'student' ? e($user['section'] ?? '—') : '—' ?></td>
                                 <td><span class="status-badge <?= $user['is_active'] ? 'active' : 'inactive' ?>"><?= $user['is_active'] ? 'Active' : 'Inactive' ?></span></td>
                                 <td>
                                     <?php if ($user['role'] === 'student'): ?>
@@ -581,7 +305,6 @@ function admin_users_query_string(array $overrides = []): string
                                 </td>
                                 <td><?= $user['last_login'] ? date('M j, Y H:i', strtotime($user['last_login'])) : '<span class="text-muted">Never</span>' ?></td>
                                 <td class="text-end">
-                                    <button type="button" class="btn btn-sm btn-outline-warning" title="Reset password" onclick="openResetPasswordModal(<?= (int) $user['id'] ?>, <?= htmlspecialchars(json_encode($user['lrn']), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($user['role']), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode(trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? ''))), ENT_QUOTES) ?>)"><i class="bi bi-key"></i></button>
                                     <button class="btn btn-sm btn-outline-primary" onclick="editUser(<?= htmlspecialchars(json_encode($user)) ?>)">
                                         <i class="bi bi-pencil"></i>
                                     </button>
@@ -598,7 +321,7 @@ function admin_users_query_string(array $overrides = []): string
                             <?php endforeach; ?>
                             <?php if (empty($users['data'])): ?>
                             <tr>
-                                <td colspan="9" class="text-center text-muted py-4">No users found</td>
+                                <td colspan="8" class="text-center text-muted py-4">No users found</td>
                             </tr>
                             <?php endif; ?>
                         </tbody>
@@ -611,7 +334,7 @@ function admin_users_query_string(array $overrides = []): string
                     <ul class="pagination mb-0 justify-content-center">
                         <?php for ($p = 1; $p <= $users['last_page']; $p++): ?>
                         <li class="page-item <?= $p === $users['page'] ? 'active' : '' ?>">
-                            <a class="page-link" href="<?= e(admin_users_query_string(['page' => $p])) ?>"><?= $p ?></a>
+                            <a class="page-link" href="?page=<?= $p ?>&search=<?= urlencode($search) ?>&role=<?= urlencode($roleFilter) ?>"><?= $p ?></a>
                         </li>
                         <?php endfor; ?>
                     </ul>
@@ -652,40 +375,13 @@ function admin_users_query_string(array $overrides = []): string
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Role *</label>
-                        <select name="role" id="create-user-role" class="form-select" required>
+                        <select name="role" class="form-select" required>
                             <option value="student">Student</option>
                             <option value="teacher">Teacher</option>
                             <option value="admin">Admin</option>
                         </select>
                     </div>
-                    <div id="create-staff-password-fields" class="d-none border rounded p-2 mb-3 bg-light">
-                        <label class="form-label">Password *</label>
-                        <input type="password" name="password" id="create-password" class="form-control mb-2" autocomplete="new-password" minlength="8">
-                        <label class="form-label">Confirm password *</label>
-                        <input type="password" name="password_confirm" id="create-password-confirm" class="form-control mb-2" autocomplete="new-password" minlength="8">
-                        <ul class="password-rules mb-0">
-                            <?php foreach ($passwordRequirements as $req): ?>
-                            <li><?= e($req) ?></li>
-                            <?php endforeach; ?>
-                        </ul>
-                    </div>
-                    <?php if ($db->tableExists('section_presets')): ?>
-                    <div id="create-student-section-fields" class="d-none border rounded p-2 mb-3 bg-light">
-                        <label class="form-label">Section preset</label>
-                        <select name="section_preset_id" class="form-select mb-2">
-                            <option value="0">— Choose preset —</option>
-                            <?php foreach ($sectionPresets as $sp): ?>
-                                <?php if ((int) $sp['is_active'] !== 1) continue; ?>
-                            <option value="<?= (int) $sp['id'] ?>"><?= e($sp['name']) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                        <label class="form-label">Custom section (optional, overrides preset)</label>
-                        <input type="text" name="section_custom" class="form-control mb-2" placeholder="Type a section if not in the list">
-                        <label class="form-label">Grade level (optional)</label>
-                        <input type="text" name="grade_level" class="form-control" placeholder="e.g., 7">
-                    </div>
-                    <?php endif; ?>
-                    <small id="create-password-hint-student" class="text-muted">New students sign in with their LRN as the initial password. Use <strong>Reset password</strong> in the user list to set a stronger password later.</small>
+                    <small class="text-muted">Default password will be the user's LRN</small>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -733,12 +429,6 @@ function admin_users_query_string(array $overrides = []): string
                             <option value="admin">Admin</option>
                         </select>
                     </div>
-                    <div id="edit-student-extra-fields" class="mb-3 d-none">
-                        <label class="form-label">Section</label>
-                        <input type="text" name="section" id="edit-section" class="form-control mb-2">
-                        <label class="form-label">Grade level</label>
-                        <input type="text" name="grade_level" id="edit-grade-level" class="form-control">
-                    </div>
                     <div class="form-check">
                         <input type="checkbox" name="is_active" id="edit-is-active" class="form-check-input" value="1" checked>
                         <label for="edit-is-active" class="form-check-label">Active</label>
@@ -752,27 +442,20 @@ function admin_users_query_string(array $overrides = []): string
         </div>
     </div>
 
-    <!-- Import Modal -->
+    <!-- Import CSV Modal -->
     <div class="modal fade" id="modalImport" tabindex="-1">
         <div class="modal-dialog">
             <form method="POST" enctype="multipart/form-data" class="modal-content">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="import">
                 <div class="modal-header">
-                    <h5 class="modal-title">Import users</h5>
+                    <h5 class="modal-title">Import Users from CSV</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label">Import mode</label>
-                        <select name="import_format" id="import-format" class="form-select">
-                            <option value="legacy">Simple CSV (first row header skipped; then LRN, first name, last name, email)</option>
-                            <option value="masterlist">DepEd-style masterlist (finds “Students” block; requires LRN + Section columns)</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">File *</label>
-                        <input type="file" name="csv_file" class="form-control" accept=".csv,.xlsx,.xls" required>
+                        <label class="form-label">CSV File *</label>
+                        <input type="file" name="csv_file" class="form-control" accept=".csv" required>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Default Role</label>
@@ -781,48 +464,11 @@ function admin_users_query_string(array $overrides = []): string
                             <option value="teacher">Teacher</option>
                         </select>
                     </div>
-                    <small class="text-muted d-block" id="import-help-legacy">Legacy CSV: the first row is ignored as a header; each following row is LRN, first name, last name, optional email.</small>
-                    <small class="text-muted d-none" id="import-help-masterlist">Masterlist: .csv or .xlsx with a “Students” title cell; next row must name columns including LRN, Section, first name, and last name. Excel requires <code>composer install</code> for .xlsx.</small>
+                    <small class="text-muted">CSV format: lrn,first_name,last_name,email (email optional)</small>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-primary">Import</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Reset password -->
-    <div class="modal fade" id="modalResetPassword" tabindex="-1">
-        <div class="modal-dialog">
-            <form method="POST" class="modal-content">
-                <?= csrf_field() ?>
-                <input type="hidden" name="action" value="reset_password">
-                <input type="hidden" name="user_id" id="reset-user-id">
-                <div class="modal-header">
-                    <h5 class="modal-title">Reset password</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <p class="mb-2">User: <strong id="reset-user-label"></strong></p>
-                    <p class="small text-muted mb-3" id="reset-user-role-hint"></p>
-                    <label class="form-label">New password</label>
-                    <input type="password" name="password" id="reset-password" class="form-control mb-2" autocomplete="new-password" minlength="8" required>
-                    <label class="form-label">Confirm new password</label>
-                    <input type="password" name="password_confirm" id="reset-password-confirm" class="form-control mb-2" autocomplete="new-password" minlength="8" required>
-                    <ul class="password-rules mb-3" id="reset-password-rules">
-                        <?php foreach ($passwordRequirements as $req): ?>
-                        <li><?= e($req) ?></li>
-                        <?php endforeach; ?>
-                    </ul>
-                    <div class="form-check d-none" id="reset-student-policy-wrap">
-                        <input class="form-check-input" type="checkbox" name="enforce_policy" id="reset-enforce-policy" value="1">
-                        <label class="form-check-label" for="reset-enforce-policy">Apply full password rules (recommended for staff accounts)</label>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-warning">Update password</button>
                 </div>
             </form>
         </div>
@@ -862,63 +508,6 @@ function admin_users_query_string(array $overrides = []): string
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-    function syncCreateUserRoleFields() {
-        const role = document.getElementById('create-user-role');
-        const teacherBox = document.getElementById('create-staff-password-fields');
-        const studentBox = document.getElementById('create-student-section-fields');
-        const pw = document.getElementById('create-password');
-        const pwc = document.getElementById('create-password-confirm');
-        const hintSt = document.getElementById('create-password-hint-student');
-        if (!role) return;
-        const r = role.value;
-        const staff = r === 'teacher' || r === 'admin';
-        if (teacherBox) {
-            teacherBox.classList.toggle('d-none', !staff);
-            if (pw) { pw.required = staff; }
-            if (pwc) { pwc.required = staff; }
-        }
-        if (studentBox) studentBox.classList.toggle('d-none', r !== 'student');
-        if (hintSt) hintSt.classList.toggle('d-none', r !== 'student');
-    }
-
-    function syncFilterRoleFields() {
-        const role = document.getElementById('filter-role')?.value || '';
-        const studentOnly = role === '' || role === 'student';
-        ['filter-section', 'filter-grade'].forEach((id) => {
-            const el = document.getElementById(id);
-            if (!el) return;
-            el.disabled = !studentOnly;
-            if (!studentOnly) el.value = '';
-        });
-    }
-    document.getElementById('filter-role')?.addEventListener('change', syncFilterRoleFields);
-    syncFilterRoleFields();
-
-    function openResetPasswordModal(userId, lrn, role, name) {
-        document.getElementById('reset-user-id').value = userId;
-        document.getElementById('reset-user-label').textContent = name + ' (' + lrn + ')';
-        const isStaff = role === 'teacher' || role === 'admin';
-        const hint = document.getElementById('reset-user-role-hint');
-        if (hint) {
-            hint.textContent = isStaff
-                ? 'Teachers and admins must use a strong password (see rules below).'
-                : 'Students: minimum 8 characters; cannot equal their LRN.';
-        }
-        const rules = document.getElementById('reset-password-rules');
-        if (rules) rules.classList.toggle('d-none', false);
-        document.getElementById('reset-password').value = '';
-        document.getElementById('reset-password-confirm').value = '';
-        new bootstrap.Modal(document.getElementById('modalResetPassword')).show();
-    }
-    document.getElementById('create-user-role')?.addEventListener('change', syncCreateUserRoleFields);
-    syncCreateUserRoleFields();
-
-    document.getElementById('import-format')?.addEventListener('change', function () {
-        const m = this.value === 'masterlist';
-        document.getElementById('import-help-legacy')?.classList.toggle('d-none', m);
-        document.getElementById('import-help-masterlist')?.classList.toggle('d-none', !m);
-    });
-
     function editUser(user) {
         document.getElementById('edit-user-id').value = user.id;
         document.getElementById('edit-lrn').value = user.lrn;
@@ -927,28 +516,8 @@ function admin_users_query_string(array $overrides = []): string
         document.getElementById('edit-email').value = user.email || '';
         document.getElementById('edit-role').value = user.role;
         document.getElementById('edit-is-active').checked = user.is_active == 1;
-        const sec = document.getElementById('edit-section');
-        const gl = document.getElementById('edit-grade-level');
-        const wrap = document.getElementById('edit-student-extra-fields');
-        if (sec) sec.value = user.section || '';
-        if (gl) gl.value = user.grade_level || '';
-        if (wrap) {
-            wrap.classList.toggle('d-none', user.role !== 'student');
-            sec.disabled = user.role !== 'student';
-            gl.disabled = user.role !== 'student';
-        }
         new bootstrap.Modal(document.getElementById('modalEdit')).show();
     }
-
-    document.getElementById('edit-role')?.addEventListener('change', function () {
-        const wrap = document.getElementById('edit-student-extra-fields');
-        const sec = document.getElementById('edit-section');
-        const gl = document.getElementById('edit-grade-level');
-        const st = this.value === 'student';
-        if (wrap) wrap.classList.toggle('d-none', !st);
-        if (sec) sec.disabled = !st;
-        if (gl) gl.disabled = !st;
-    });
 
     function openCourseModal(userId, userRole, userName) {
         document.getElementById('course-action-user-id').value = userId;

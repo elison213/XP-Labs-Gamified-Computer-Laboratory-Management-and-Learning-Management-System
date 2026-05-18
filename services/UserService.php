@@ -7,7 +7,6 @@
 namespace XPLabs\Services;
 
 use XPLabs\Lib\Database;
-use XPLabs\Lib\PasswordPolicy;
 
 class UserService
 {
@@ -63,34 +62,6 @@ class UserService
     }
 
     /**
-     * Verify student LRN + password for lockscreen lab login.
-     */
-    public function verifyStudentLabCredentials(string $lrn, string $password): ?array
-    {
-        $lrn = trim($lrn);
-        if ($lrn === '' || $password === '') {
-            return null;
-        }
-
-        $user = $this->db->fetch(
-            "SELECT id, lrn, email, first_name, last_name, role, password_hash, is_active,
-                    grade_level, section, course_id
-             FROM users
-             WHERE lrn = ? AND is_active = 1
-             LIMIT 1",
-            [$lrn]
-        );
-        if (!$user || ($user['role'] ?? '') !== 'student') {
-            return null;
-        }
-        if (empty($user['password_hash']) || !password_verify($password, $user['password_hash'])) {
-            return null;
-        }
-        unset($user['password_hash']);
-        return $user;
-    }
-
-    /**
      * List users with pagination.
      */
     public function list(array $filters = [], int $page = 1, int $perPage = 25): array
@@ -104,22 +75,11 @@ class UserService
         }
 
         if (!empty($filters['search'])) {
-            $where[] = '(first_name LIKE ? OR last_name LIKE ? OR lrn LIKE ? OR email LIKE ?)';
+            $where[] = '(first_name LIKE ? OR last_name LIKE ? OR lrn LIKE ?)';
             $search = '%' . $filters['search'] . '%';
             $params[] = $search;
             $params[] = $search;
             $params[] = $search;
-            $params[] = $search;
-        }
-
-        if (!empty($filters['section'])) {
-            $where[] = 'section = ?';
-            $params[] = $filters['section'];
-        }
-
-        if (!empty($filters['grade_level'])) {
-            $where[] = 'grade_level = ?';
-            $params[] = $filters['grade_level'];
         }
 
         if (isset($filters['is_active'])) {
@@ -131,7 +91,7 @@ class UserService
         $offset = ($page - 1) * $perPage;
 
         $total = (int) $this->db->fetchOne("SELECT COUNT(*) FROM users WHERE $whereClause", $params);
-        $users = $this->db->fetchAll("SELECT id, lrn, first_name, last_name, email, role, is_active, section, grade_level, last_login, created_at FROM users WHERE $whereClause ORDER BY created_at DESC LIMIT $perPage OFFSET $offset", $params);
+        $users = $this->db->fetchAll("SELECT id, lrn, first_name, last_name, email, role, is_active, last_login, created_at FROM users WHERE $whereClause ORDER BY created_at DESC LIMIT $perPage OFFSET $offset", $params);
 
         return [
             'data' => $users,
@@ -152,43 +112,17 @@ class UserService
             throw new \Exception("User with LRN '{$data['lrn']}' already exists.");
         }
 
-        $role = $data['role'] ?? 'student';
-        $lrn = (string) ($data['lrn'] ?? '');
-        if ($role === 'teacher' || $role === 'admin') {
-            $pwd = (string) ($data['password'] ?? '');
-            if ($pwd === '') {
-                throw new \InvalidArgumentException('Password is required for ' . $role . ' accounts.');
-            }
-            $policyError = PasswordPolicy::validate($pwd, $lrn);
-            if ($policyError !== null) {
-                throw new \InvalidArgumentException($policyError);
-            }
-            $passwordHash = password_hash($pwd, PASSWORD_DEFAULT);
-        } else {
-            $fallback = $lrn;
-            $passwordHash = password_hash((string) ($data['password'] ?? $fallback), PASSWORD_DEFAULT);
-        }
+        $passwordHash = password_hash($data['password'] ?? $data['lrn'], PASSWORD_DEFAULT);
 
-        $row = [
+        return $this->db->insert('users', [
             'lrn' => $data['lrn'],
             'first_name' => $data['first_name'],
             'last_name' => $data['last_name'],
-            'email' => !empty($data['email']) ? trim((string) $data['email']) : null,
-            'role' => $role,
+            'email' => $data['email'] ?? null,
+            'role' => $data['role'] ?? 'student',
             'password_hash' => $passwordHash,
             'is_active' => 1,
-        ];
-
-        if (array_key_exists('section', $data)) {
-            $s = trim((string) ($data['section'] ?? ''));
-            $row['section'] = $s !== '' ? $s : null;
-        }
-        if (array_key_exists('grade_level', $data)) {
-            $g = trim((string) ($data['grade_level'] ?? ''));
-            $row['grade_level'] = $g !== '' ? $g : null;
-        }
-
-        return $this->db->insert('users', $row);
+        ]);
     }
 
     /**
@@ -196,15 +130,8 @@ class UserService
      */
     public function update(int $id, array $data): bool
     {
-        $allowed = ['first_name', 'last_name', 'email', 'role', 'is_active', 'section', 'grade_level'];
+        $allowed = ['first_name', 'last_name', 'email', 'role', 'is_active'];
         $update = array_intersect_key($data, array_flip($allowed));
-
-        foreach (['section', 'grade_level'] as $key) {
-            if (array_key_exists($key, $update)) {
-                $v = trim((string) $update[$key]);
-                $update[$key] = $v === '' ? null : $v;
-            }
-        }
 
         if (empty($update)) {
             return false;
@@ -222,72 +149,11 @@ class UserService
     }
 
     /**
-     * Set password (admin reset). Applies policy for teacher/admin; students may use simpler rules when forced.
-     */
-    public function setPassword(int $id, string $password, bool $enforcePolicy = true): bool
-    {
-        $user = $this->db->fetch('SELECT id, lrn, role FROM users WHERE id = ?', [$id]);
-        if (!$user) {
-            throw new \InvalidArgumentException('User not found.');
-        }
-
-        $role = (string) ($user['role'] ?? '');
-        $lrn = (string) ($user['lrn'] ?? '');
-
-        if ($enforcePolicy && in_array($role, ['teacher', 'admin'], true)) {
-            $policyError = PasswordPolicy::validate($password, $lrn);
-            if ($policyError !== null) {
-                throw new \InvalidArgumentException($policyError);
-            }
-        } elseif ($enforcePolicy && $role === 'student') {
-            if (strlen($password) < PasswordPolicy::MIN_LENGTH) {
-                throw new \InvalidArgumentException('Student password must be at least ' . PasswordPolicy::MIN_LENGTH . ' characters.');
-            }
-            if ($lrn !== '' && hash_equals(strtolower($lrn), strtolower($password))) {
-                throw new \InvalidArgumentException('Password cannot be the same as the LRN.');
-            }
-        }
-
-        return $this->db->update('users', [
-            'password_hash' => password_hash($password, PASSWORD_DEFAULT),
-        ], 'id = ?', [$id]) > 0;
-    }
-
-    /**
-     * Distinct section values for filters (students).
-     *
-     * @return string[]
-     */
-    public function getDistinctSections(): array
-    {
-        $rows = $this->db->fetchAll(
-            "SELECT DISTINCT section FROM users WHERE role = 'student' AND section IS NOT NULL AND section != '' ORDER BY section ASC"
-        );
-        return array_values(array_filter(array_map(static fn ($r) => (string) ($r['section'] ?? ''), $rows)));
-    }
-
-    /**
-     * Distinct grade levels for filters (students).
-     *
-     * @return string[]
-     */
-    public function getDistinctGradeLevels(): array
-    {
-        $rows = $this->db->fetchAll(
-            "SELECT DISTINCT grade_level FROM users WHERE role = 'student' AND grade_level IS NOT NULL AND grade_level != '' ORDER BY grade_level ASC"
-        );
-        return array_values(array_filter(array_map(static fn ($r) => (string) ($r['grade_level'] ?? ''), $rows)));
-    }
-
-    /**
      * Import users from CSV data.
      */
     public function importFromCsv(array $rows, array $columnMapping, string $role = 'student', int $importedBy = 0): array
     {
         $results = ['success' => 0, 'duplicate' => 0, 'error' => 0, 'errors' => []];
-
-        $emailCol = isset($columnMapping['email']) && $columnMapping['email'] !== null ? (int) $columnMapping['email'] : null;
-        $sectionCol = isset($columnMapping['section']) && $columnMapping['section'] !== null ? (int) $columnMapping['section'] : null;
 
         $this->db->beginTransaction();
         try {
@@ -296,9 +162,9 @@ class UserService
                 $firstName = trim($row[$columnMapping['first_name']] ?? '');
                 $lastName = trim($row[$columnMapping['last_name']] ?? '');
 
-                if ($lrn === '' || $firstName === '' || $lastName === '') {
+                if (empty($lrn) || empty($firstName) || empty($lastName)) {
                     $results['error']++;
-                    $results['errors'][] = 'Row ' . ($index + 1) . ': Missing required fields';
+                    $results['errors'][] = "Row " . ($index + 1) . ": Missing required fields";
                     continue;
                 }
 
@@ -308,19 +174,14 @@ class UserService
                     continue;
                 }
 
-                $payload = [
+                $this->create([
                     'lrn' => $lrn,
                     'first_name' => $firstName,
                     'last_name' => $lastName,
-                    'email' => $emailCol !== null ? trim((string) ($row[$emailCol] ?? '')) : '',
+                    'email' => trim($row[$columnMapping['email']] ?? ''),
                     'role' => $role,
-                    'password' => $lrn,
-                ];
-                if ($sectionCol !== null) {
-                    $payload['section'] = trim((string) ($row[$sectionCol] ?? ''));
-                }
-
-                $this->create($payload);
+                    'password' => $lrn, // Default password is LRN
+                ]);
                 $results['success']++;
             }
 
@@ -346,9 +207,6 @@ class UserService
             'sample' => [],
         ];
 
-        $emailCol = isset($columnMapping['email']) && $columnMapping['email'] !== null ? (int) $columnMapping['email'] : null;
-        $sectionCol = isset($columnMapping['section']) && $columnMapping['section'] !== null ? (int) $columnMapping['section'] : null;
-
         foreach ($rows as $index => $row) {
             $lrn = trim($row[$columnMapping['lrn']] ?? '');
             $firstName = trim($row[$columnMapping['first_name']] ?? '');
@@ -367,35 +225,18 @@ class UserService
             }
 
             if (count($out['sample']) < 25) {
-                $sample = [
+                $out['sample'][] = [
                     'row' => $index + 1,
                     'lrn' => $lrn,
                     'first_name' => $firstName,
                     'last_name' => $lastName,
-                    'email' => $emailCol !== null ? trim((string) ($row[$emailCol] ?? '')) : '',
+                    'email' => trim($row[$columnMapping['email'] ?? ''] ?? ''),
                     'would_skip' => $this->findByLrn($lrn) !== null,
                 ];
-                if ($sectionCol !== null) {
-                    $sample['section'] = trim((string) ($row[$sectionCol] ?? ''));
-                }
-                $out['sample'][] = $sample;
             }
         }
 
         return $out;
-    }
-
-    /**
-     * Parse a masterlist-style CSV/XLSX and import rows (LRN, names, Section required in headers).
-     *
-     * @throws \RuntimeException|\InvalidArgumentException
-     */
-    public function importFromMasterlistUpload(string $tmpPath, string $originalName, string $role = 'student'): array
-    {
-        $grid = MasterlistSpreadsheetParser::fileToGrid($tmpPath, $originalName);
-        $parsed = MasterlistSpreadsheetParser::extractStudentRows($grid);
-
-        return $this->importFromCsv($parsed['rows'], $parsed['column_mapping'], $role, 0);
     }
 
     /**

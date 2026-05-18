@@ -6,8 +6,6 @@
 
 namespace XPLabs\Lib;
 
-require_once __DIR__ . '/autoload.php';
-
 class Database
 {
     private static ?Database $instance = null;

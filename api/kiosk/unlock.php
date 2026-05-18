@@ -7,7 +7,7 @@
  * - Creates a PC session
  * - Queues an unlock command for the target PC
  *
- * Security: valid X-Kiosk-Token / Bearer (Lab Management–issued) or legacy LAN IP allowlist (config/app.php).
+ * Security model (LAN): restrict by allowed kiosk IPs (config/app.php).
  */
 header('Content-Type: application/json');
 
@@ -15,7 +15,6 @@ require_once __DIR__ . '/../../lib/Database.php';
 require_once __DIR__ . '/../../services/UserService.php';
 require_once __DIR__ . '/../../services/PCService.php';
 require_once __DIR__ . '/../../services/AttendanceService.php';
-require_once __DIR__ . '/../../services/KioskDeviceService.php';
 require_once __DIR__ . '/../middleware/CorsMiddleware.php';
 require_once __DIR__ . '/../../src/Core/Request.php';
 
@@ -23,7 +22,6 @@ use XPLabs\Lib\Database;
 use XPLabs\Services\UserService;
 use XPLabs\Services\PCService;
 use XPLabs\Services\AttendanceService;
-use XPLabs\Services\KioskDeviceService;
 use XPLabs\Api\Middleware\CorsMiddleware;
 use XPLabs\Core\Request;
 
@@ -38,41 +36,16 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $config = require __DIR__ . '/../../config/app.php';
 $req = Request::fromGlobals();
 $clientIp = $req->ip();
-
-$kioskSvc = new KioskDeviceService();
-$kioskToken = trim((string) ($_SERVER['HTTP_X_KIOSK_TOKEN'] ?? ''));
-if ($kioskToken === '') {
-    $authHdr = (string) ($_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['Authorization'] ?? '');
-    if (preg_match('/Bearer\s+(.+)/i', $authHdr, $m)) {
-        $kioskToken = trim($m[1]);
-    }
-}
-
-$kioskDevice = null;
-if ($kioskToken !== '' && $kioskSvc->tableExists()) {
-    $kioskDevice = $kioskSvc->verifyApiToken($kioskToken);
-}
-
 $allowedIps = $config['kiosk']['allowed_ips'] ?? [];
-$kioskAuthOk = false;
-if ($kioskDevice) {
-    $kioskAuthOk = true;
-} elseif (is_array($allowedIps) && count($allowedIps) > 0 && in_array($clientIp, $allowedIps, true)) {
-    $kioskAuthOk = true;
-}
-
-if (!$kioskAuthOk) {
+if (!is_array($allowedIps) || count($allowedIps) === 0) {
     http_response_code(403);
-    echo json_encode([
-        'error' => 'Kiosk not authorized',
-        'ip' => $clientIp,
-        'hint' => 'Provide X-Kiosk-Token (or Bearer) from Lab Management, or use an IP in kiosk.allowed_ips',
-    ]);
+    echo json_encode(['error' => 'Kiosk allowlist is not configured']);
     exit;
 }
-
-if ($kioskDevice) {
-    $kioskSvc->touchDevice((int) $kioskDevice['id'], $clientIp);
+if (!in_array($clientIp, $allowedIps, true)) {
+    http_response_code(403);
+    echo json_encode(['error' => 'Kiosk not allowed from this IP', 'ip' => $clientIp]);
+    exit;
 }
 
 $input = json_decode(file_get_contents('php://input'), true) ?: [];
@@ -85,11 +58,6 @@ if ($lrn === '') {
     echo json_encode(['error' => 'LRN is required']);
     exit;
 }
-
-if ($kioskDevice && ($floorId === null || $floorId <= 0)) {
-    $floorId = (int) $kioskDevice['floor_id'];
-}
-
 if ($floorId !== null && $floorId <= 0) {
     http_response_code(400);
     echo json_encode(['error' => 'Invalid floor_id']);

@@ -11,7 +11,6 @@ use XPLabs\Lib\Database;
 class LabService
 {
     private Database $db;
-    private int $heartbeatOfflineThresholdSeconds = 300;
 
     public function __construct()
     {
@@ -67,28 +66,11 @@ class LabService
     }
 
     /**
-     * Delete a lab and all floors/stations belonging to it.
+     * Delete a lab.
      */
     public function deleteLab(int $labId): bool
     {
-        $this->db->beginTransaction();
-        try {
-            $floorRows = $this->db->fetchAll('SELECT id FROM lab_floors WHERE lab_id = ?', [$labId]);
-            foreach ($floorRows as $fr) {
-                $floorId = (int) $fr['id'];
-                $stationRows = $this->db->fetchAll('SELECT id FROM lab_stations WHERE floor_id = ?', [$floorId]);
-                foreach ($stationRows as $sr) {
-                    $this->deleteStation((int) $sr['id']);
-                }
-                $this->db->delete('lab_floors', 'id = ?', [$floorId]);
-            }
-            $deleted = $this->db->delete('labs', 'id = ?', [$labId]) > 0;
-            $this->db->commit();
-            return $deleted;
-        } catch (\Throwable $e) {
-            $this->db->rollback();
-            throw $e;
-        }
+        return $this->db->delete('labs', 'id = ?', [$labId]) > 0;
     }
 
     /**
@@ -166,17 +148,11 @@ class LabService
         $sql = "SELECT ls.*, lf.name as floor_name,
                        u.first_name, u.last_name,
                        sa.assigned_at as checkin_time,
-                       sa.task,
-                       lp.id as pc_id,
-                       lp.hostname as pc_hostname,
-                       lp.ip_address as pc_ip_address,
-                       lp.status as pc_status,
-                       lp.last_heartbeat as pc_last_heartbeat
+                       sa.task
                 FROM lab_stations ls
                 LEFT JOIN lab_floors lf ON ls.floor_id = lf.id
                 LEFT JOIN station_assignments sa ON ls.id = sa.station_id
                 LEFT JOIN users u ON sa.user_id = u.id
-                LEFT JOIN lab_pcs lp ON lp.station_id = ls.id
                 WHERE 1=1";
         $params = [];
 
@@ -187,18 +163,7 @@ class LabService
 
         $sql .= " ORDER BY COALESCE(ls.sort_order, 0) ASC, ls.station_code ASC";
 
-        $rows = $this->db->fetchAll($sql, $params);
-        return array_map(function (array $row): array {
-            $row['manual_status'] = $row['status'] ?? 'offline';
-            $row['status'] = $this->resolveEffectiveStationStatus($row);
-            if (empty($row['hostname']) && !empty($row['pc_hostname'])) {
-                $row['hostname'] = $row['pc_hostname'];
-            }
-            if (empty($row['ip_address']) && !empty($row['pc_ip_address'])) {
-                $row['ip_address'] = $row['pc_ip_address'];
-            }
-            return $row;
-        }, $rows);
+        return $this->db->fetchAll($sql, $params);
     }
 
     /**
@@ -240,38 +205,8 @@ class LabService
     {
         $allowed = ['station_code', 'row_label', 'col_number', 'status', 'hostname', 'ip_address', 'mac_address', 'sort_order'];
         $update = array_intersect_key($data, array_flip($allowed));
-        if (empty($update)) {
-            return false;
-        }
-        $ok = $this->db->update('lab_stations', $update, 'id = ?', [$stationId]) > 0;
-        if (!$ok) {
-            return false;
-        }
-        $pcSync = [];
-        if (array_key_exists('hostname', $update)) {
-            $pcSync['hostname'] = $update['hostname'] ?: null;
-        }
-        if (array_key_exists('ip_address', $update)) {
-            $pcSync['ip_address'] = $update['ip_address'] ?: null;
-        }
-        if (array_key_exists('mac_address', $update)) {
-            $pcSync['mac_address'] = $update['mac_address'] ?: null;
-        }
-        if (array_key_exists('status', $update)) {
-            $mapped = strtolower((string) $update['status']);
-            if ($mapped === 'active') {
-                $mapped = 'online';
-            }
-            if (!in_array($mapped, ['online', 'idle', 'locked', 'offline', 'maintenance'], true)) {
-                $mapped = 'offline';
-            }
-            $pcSync['status'] = $mapped;
-        }
-        if (!empty($pcSync)) {
-            $pcSync['updated_at'] = date('Y-m-d H:i:s');
-            $this->db->update('lab_pcs', $pcSync, 'station_id = ?', [$stationId]);
-        }
-        return true;
+
+        return $this->db->update('lab_stations', $update, 'id = ?', [$stationId]) > 0;
     }
 
     /**
@@ -279,23 +214,7 @@ class LabService
      */
     public function deleteStation(int $stationId): bool
     {
-        $this->db->beginTransaction();
-        try {
-            $this->db->query(
-                "UPDATE lab_pcs SET station_id = NULL, updated_at = NOW() WHERE station_id = ?",
-                [$stationId]
-            );
-            $deleted = $this->db->delete('lab_stations', 'id = ?', [$stationId]) > 0;
-            if (!$deleted) {
-                $this->db->rollback();
-                return false;
-            }
-            $this->db->commit();
-            return true;
-        } catch (\Throwable $e) {
-            $this->db->rollback();
-            throw $e;
-        }
+        return $this->db->delete('lab_stations', 'id = ?', [$stationId]) > 0;
     }
 
     /**
@@ -389,69 +308,27 @@ class LabService
      */
     public function getStats(?int $floorId = null): array
     {
-        $stations = $this->getStations($floorId);
-        $total = count($stations);
-        $active = 0;
-        $idle = 0;
-        $locked = 0;
-        $offline = 0;
-        $maintenance = 0;
-        foreach ($stations as $station) {
-            $status = (string) ($station['status'] ?? 'offline');
-            if ($status === 'active') {
-                $active++;
-            } elseif ($status === 'idle') {
-                $idle++;
-            } elseif ($status === 'locked') {
-                $locked++;
-            } elseif ($status === 'maintenance') {
-                $maintenance++;
-            } else {
-                $offline++;
-            }
+        $where = 'WHERE 1=1';
+        $params = [];
+
+        if ($floorId) {
+            $where .= ' AND floor_id = ?';
+            $params[] = $floorId;
         }
+
+        $total = (int) $this->db->fetchOne("SELECT COUNT(*) FROM lab_stations $where", $params);
+        $active = (int) $this->db->fetchOne("SELECT COUNT(*) FROM lab_stations $where AND status = 'active'", $params);
+        $idle = (int) $this->db->fetchOne("SELECT COUNT(*) FROM lab_stations $where AND status = 'idle'", $params);
+        $offline = (int) $this->db->fetchOne("SELECT COUNT(*) FROM lab_stations $where AND status = 'offline'", $params);
+        $maintenance = (int) $this->db->fetchOne("SELECT COUNT(*) FROM lab_stations $where AND status = 'maintenance'", $params);
 
         return [
             'total' => $total,
             'active' => $active,
             'idle' => $idle,
-            'locked' => $locked,
             'offline' => $offline,
             'maintenance' => $maintenance,
         ];
-    }
-
-    private function resolveEffectiveStationStatus(array $station): string
-    {
-        if (!empty($station['is_maintenance']) || ($station['status'] ?? '') === 'maintenance') {
-            return 'maintenance';
-        }
-
-        $pcStatus = strtolower(trim((string) ($station['pc_status'] ?? '')));
-        $lastHeartbeat = $station['pc_last_heartbeat'] ?? null;
-        if ($pcStatus !== '') {
-            if ($lastHeartbeat) {
-                $heartbeatTs = strtotime((string) $lastHeartbeat);
-                if ($heartbeatTs !== false && (time() - $heartbeatTs) > $this->heartbeatOfflineThresholdSeconds) {
-                    return 'offline';
-                }
-            }
-            if ($pcStatus === 'locked') {
-                return 'locked';
-            }
-            if ($pcStatus === 'online') {
-                return !empty($station['checkin_time']) ? 'active' : 'idle';
-            }
-            if (in_array($pcStatus, ['idle', 'maintenance', 'offline'], true)) {
-                return $pcStatus;
-            }
-        }
-
-        $fallback = strtolower(trim((string) ($station['status'] ?? 'offline')));
-        if (in_array($fallback, ['active', 'idle', 'locked', 'offline', 'maintenance'], true)) {
-            return $fallback;
-        }
-        return 'offline';
     }
 
     /**
@@ -459,25 +336,10 @@ class LabService
      */
     public function bulkUpdateStatus(array $stationIds, string $status): int
     {
-        if (empty($stationIds)) {
-            return 0;
-        }
         $placeholders = implode(',', array_fill(0, count($stationIds), '?'));
-        $updated = $this->db->query(
+        return $this->db->query(
             "UPDATE lab_stations SET status = ? WHERE id IN ($placeholders)",
             array_merge([$status], $stationIds)
         )->rowCount();
-        $pcStatus = strtolower($status);
-        if ($pcStatus === 'active') {
-            $pcStatus = 'online';
-        }
-        if (!in_array($pcStatus, ['online', 'idle', 'locked', 'offline', 'maintenance'], true)) {
-            $pcStatus = 'offline';
-        }
-        $this->db->query(
-            "UPDATE lab_pcs SET status = ?, updated_at = NOW() WHERE station_id IN ($placeholders)",
-            array_merge([$pcStatus], $stationIds)
-        );
-        return $updated;
     }
 }

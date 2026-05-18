@@ -7,15 +7,12 @@ require_once __DIR__ . '/includes/bootstrap.php';
 use XPLabs\Lib\Auth;
 use XPLabs\Lib\Database;
 use XPLabs\Services\LabService;
-use XPLabs\Services\PCService;
 
 Auth::requireRole(['admin', 'teacher']);
 
 $labService = new LabService();
-$pcService = new PCService();
 $floors = $labService->getFloors();
 $stations = $labService->getStations();
-$unassignedPcCount = $pcService->getUnassignedCount();
 
 // Group stations by floor
 $stationsByFloor = [];
@@ -283,7 +280,7 @@ $gridRows = $currentFloor['grid_rows'] ?? 5;
                 <button class="btn btn-outline-secondary btn-sm" onclick="saveLayout()">
                     <i class="bi bi-save me-1"></i> Save Layout
                 </button>
-                <button type="button" class="btn btn-primary btn-sm" onclick="openModal('modalAddStation')">
+                <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalAddStation">
                     <i class="bi bi-plus-lg me-1"></i> Add Station
                 </button>
             </div>
@@ -293,12 +290,6 @@ $gridRows = $currentFloor['grid_rows'] ?? 5;
         <div class="alert alert-<?= $message['type'] ?> alert-dismissible fade show">
             <?= e($message['text']) ?>
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-        <?php endif; ?>
-
-        <?php if ($unassignedPcCount > 0): ?>
-        <div class="alert alert-warning">
-            <?= (int) $unassignedPcCount ?> discovered PC(s) are currently unassigned and will not appear in seat plan until assigned to a floor/station.
         </div>
         <?php endif; ?>
 
@@ -453,7 +444,7 @@ $gridRows = $currentFloor['grid_rows'] ?? 5;
                     <div class="row">
                         <div class="col-6 mb-3">
                             <label class="form-label">Row</label>
-                            <select name="row_label" id="add-station-row" class="form-select">
+                            <select name="row_label" class="form-select">
                                 <?php for ($r = 0; $r < $gridRows; $r++): ?>
                                 <option value="<?= chr(65 + $r) ?>"><?= chr(65 + $r) ?></option>
                                 <?php endfor; ?>
@@ -461,7 +452,7 @@ $gridRows = $currentFloor['grid_rows'] ?? 5;
                         </div>
                         <div class="col-6 mb-3">
                             <label class="form-label">Column</label>
-                            <select name="col_number" id="add-station-col" class="form-select">
+                            <select name="col_number" class="form-select">
                                 <?php for ($c = 1; $c <= $gridCols; $c++): ?>
                                 <option value="<?= $c ?>"><?= $c ?></option>
                                 <?php endfor; ?>
@@ -481,65 +472,6 @@ $gridRows = $currentFloor['grid_rows'] ?? 5;
     <script>
     let draggedCard = null;
     let draggedData = null;
-    let fallbackBackdrop = null;
-
-    function openModal(modalId) {
-        const modalEl = document.getElementById(modalId);
-        if (!modalEl) return;
-        if (window.bootstrap && bootstrap.Modal) {
-            new bootstrap.Modal(modalEl).show();
-            return;
-        }
-        modalEl.style.display = 'block';
-        modalEl.classList.add('show');
-        modalEl.setAttribute('aria-modal', 'true');
-        modalEl.removeAttribute('aria-hidden');
-        document.body.classList.add('modal-open');
-        if (!fallbackBackdrop) {
-            fallbackBackdrop = document.createElement('div');
-            fallbackBackdrop.className = 'modal-backdrop fade show';
-            fallbackBackdrop.addEventListener('click', closeOpenFallbackModals);
-        }
-        document.body.appendChild(fallbackBackdrop);
-    }
-
-    function closeOpenFallbackModals() {
-        document.querySelectorAll('.modal.show').forEach((modalEl) => {
-            modalEl.classList.remove('show');
-            modalEl.style.display = 'none';
-            modalEl.setAttribute('aria-hidden', 'true');
-            modalEl.removeAttribute('aria-modal');
-        });
-        document.body.classList.remove('modal-open');
-        if (fallbackBackdrop && fallbackBackdrop.parentNode) {
-            fallbackBackdrop.parentNode.removeChild(fallbackBackdrop);
-        }
-    }
-
-    function swapStations(firstCard, secondCard) {
-        if (!firstCard || !secondCard || firstCard === secondCard) {
-            return;
-        }
-        const firstCell = firstCard.closest('.grid-cell');
-        const secondCell = secondCard.closest('.grid-cell');
-        if (!firstCell || !secondCell || firstCell === secondCell) {
-            return;
-        }
-        const firstRow = firstCard.dataset.row;
-        const firstCol = firstCard.dataset.col;
-        const secondRow = secondCard.dataset.row;
-        const secondCol = secondCard.dataset.col;
-        firstCard.dataset.row = secondRow;
-        firstCard.dataset.col = secondCol;
-        secondCard.dataset.row = firstRow;
-        secondCard.dataset.col = firstCol;
-        firstCell.innerHTML = '';
-        secondCell.innerHTML = '';
-        firstCell.classList.add('has-station');
-        secondCell.classList.add('has-station');
-        firstCell.appendChild(secondCard);
-        secondCell.appendChild(firstCard);
-    }
 
     // Drag and Drop
     document.querySelectorAll('.station-card').forEach(card => {
@@ -584,7 +516,17 @@ $gridRows = $currentFloor['grid_rows'] ?? 5;
             // Check if target cell has a station
             const existingCard = this.querySelector('.station-card');
             if (existingCard && existingCard !== draggedCard) {
-                swapStations(draggedCard, existingCard);
+                // Swap stations
+                const existingData = {
+                    stationId: existingCard.dataset.stationId,
+                    row: existingCard.dataset.row,
+                    col: existingCard.dataset.col
+                };
+                
+                // Move dragged to target
+                moveStation(draggedData.stationId, toRow, toCol);
+                // Move existing to dragged's old position
+                moveStation(existingData.stationId, draggedData.fromRow, draggedData.fromCol);
             } else if (!existingCard) {
                 // Move to empty cell
                 moveStation(draggedData.stationId, toRow, toCol);
@@ -666,36 +608,7 @@ $gridRows = $currentFloor['grid_rows'] ?? 5;
         
         grid.innerHTML = html;
         grid.style.setProperty('--cols', currentCols);
-        syncAddStationOptions();
         reinitDragDrop();
-    }
-
-    function syncAddStationOptions() {
-        const rowSelect = document.getElementById('add-station-row');
-        const colSelect = document.getElementById('add-station-col');
-        if (rowSelect) {
-            const prev = rowSelect.value;
-            rowSelect.innerHTML = '';
-            for (let r = 0; r < currentRows; r++) {
-                const rowLabel = String.fromCharCode(65 + r);
-                const opt = document.createElement('option');
-                opt.value = rowLabel;
-                opt.textContent = rowLabel;
-                rowSelect.appendChild(opt);
-            }
-            rowSelect.value = Array.from(rowSelect.options).some(o => o.value === prev) ? prev : rowSelect.options[0]?.value;
-        }
-        if (colSelect) {
-            const prev = colSelect.value;
-            colSelect.innerHTML = '';
-            for (let c = 1; c <= currentCols; c++) {
-                const opt = document.createElement('option');
-                opt.value = String(c);
-                opt.textContent = String(c);
-                colSelect.appendChild(opt);
-            }
-            colSelect.value = Array.from(colSelect.options).some(o => o.value === prev) ? prev : colSelect.options[0]?.value;
-        }
     }
 
     function reinitDragDrop() {
@@ -740,21 +653,14 @@ $gridRows = $currentFloor['grid_rows'] ?? 5;
                 
                 const existingCard = this.querySelector('.station-card');
                 if (existingCard && existingCard !== draggedCard) {
-                    swapStations(draggedCard, existingCard);
+                    moveStation(draggedData.stationId, toRow, toCol);
+                    moveStation(existingCard.dataset.stationId, draggedData.fromRow, draggedData.fromCol);
                 } else if (!existingCard) {
                     moveStation(draggedData.stationId, toRow, toCol);
                 }
             });
         });
     }
-
-    document.querySelectorAll('[data-bs-dismiss="modal"]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-            if (!(window.bootstrap && bootstrap.Modal)) {
-                closeOpenFallbackModals();
-            }
-        });
-    });
 
     function saveLayout() {
         const layout = {

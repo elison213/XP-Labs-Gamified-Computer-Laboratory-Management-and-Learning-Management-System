@@ -16,12 +16,6 @@ $role = 'teacher';
 
 $userId = Auth::id();
 $db = Database::getInstance();
-$hasAttemptIsPreview = (int) $db->fetchOne(
-    "SELECT COUNT(*) FROM information_schema.columns
-     WHERE table_schema = DATABASE()
-       AND table_name = 'quiz_attempts'
-       AND column_name = 'is_preview'"
-) > 0;
 $labService = new LabService();
 $attendanceService = new AttendanceService();
 $quizService = new QuizService();
@@ -57,7 +51,7 @@ $recentQuizzes = $db->fetchAll(
             COUNT(qa.id) as attempt_count
      FROM quizzes q
      JOIN courses c ON q.course_id = c.id
-     LEFT JOIN quiz_attempts qa ON q.id = qa.quiz_id AND qa.status = 'completed'" . ($hasAttemptIsPreview ? " AND COALESCE(qa.is_preview, 0) = 0" : "") . "
+     LEFT JOIN quiz_attempts qa ON q.id = qa.quiz_id AND qa.status = 'completed'
      WHERE q.created_by = ?
      GROUP BY q.id
      ORDER BY q.created_at DESC
@@ -112,7 +106,6 @@ $draftQuizzes = $db->fetchAll(
             <div class="d-flex gap-2">
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalStartSession">▶️ Start Session</button>
                 <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalCreateQuiz">❓ Create Quiz</button>
-                <a href="dashboard_lab_pcs.php" class="btn btn-outline-primary">🖥️ Lab Management</a>
             </div>
         </div>
 
@@ -231,7 +224,6 @@ $draftQuizzes = $db->fetchAll(
                     <div class="card-body">
                         <div class="d-grid gap-2">
                             <a href="monitoring.php" class="btn btn-outline-primary">🖥️ Monitor Lab</a>
-                            <a href="dashboard_lab_pcs.php" class="btn btn-outline-primary">🧭 Open Lab Management</a>
                             <a href="attendance_history.php" class="btn btn-outline-primary">📋 View Attendance</a>
                             <a href="course_enrollments.php" class="btn btn-outline-primary">👥 Enroll Students</a>
                             <a href="quizzes_manage.php" class="btn btn-outline-primary">❓ Manage Quizzes</a>

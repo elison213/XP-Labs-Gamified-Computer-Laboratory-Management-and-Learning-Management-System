@@ -80,30 +80,6 @@ Use this when you only need to apply the latest app update on an existing server
 .\Apply-LabStabilityUpdate.ps1 -ProjectPath "C:\xampp\htdocs\xplabs" -XamppPath "C:\xampp" -DatabaseName "xplabs" -DbUser "root"
 ```
 
-This is the canonical server deployment/update path for production.
-
-## One-click deployment launcher (server + client)
-
-Use the one-click orchestrator for either server or client mode:
-
-```powershell
-Set-ExecutionPolicy Bypass -Scope Process -Force
-cd C:\xampp\htdocs\xplabs
-.\windows\config\Invoke-OneClickDeployment.ps1
-```
-
-Build distributable EXE launcher:
-
-```powershell
-Set-ExecutionPolicy Bypass -Scope Process -Force
-cd C:\xampp\htdocs\xplabs
-.\windows\config\Build-OneClickDeploymentExe.ps1 -ProjectPath "C:\xampp\htdocs\xplabs"
-```
-
-Output:
-- `dist\deploy\XPLabsOneClickDeploy-<version>.exe`
-- `dist\deploy\XPLabsOneClickDeploy-<version>.iss`
-
 ## Client machine config script
 On each client (run elevated):
 
@@ -123,8 +99,6 @@ Run on each client (elevated PowerShell):
 ```powershell
 .\Deploy-ClientPowerShellApp.ps1 -ProjectPath "C:\xampp\htdocs\xplabs" -ServerBaseUrl "http://local.xplabs.com/xplabs" -FloorId 1 -StationId 1 -StartAgentNow
 ```
-
-This is the canonical client deployment path for production.
 
 To include optional UI apps during deployment:
 - `-LockscreenExePath "<path_to_XPLabs.LockScreen.exe>"`
@@ -295,12 +269,4 @@ Invoke-RestMethod -Method GET -Uri "http://local.xplabs.com/xplabs/api/pc/comman
 - Kiosk: verify unlock succeeds for enrolled student and fails for invalid LRN.
 - Force logout: verify command is queued and session ends.
 - Agent roundtrip: queue lock/unlock command and confirm command status changes to `executed`.
-
-## Deployment hardening references
-- Script classification (`primary`/`support`/`deprecated`) and compatibility mapping:
-  - [SCRIPT_CATALOG.md](C:/xampp/htdocs/xplabs/windows/SCRIPT_CATALOG.md)
-- Validation gates and rollback commands:
-  - [SCRIPT_CATALOG.md](C:/xampp/htdocs/xplabs/windows/SCRIPT_CATALOG.md)
-- Copy/paste launch command reference:
-  - [DEPLOY_COMMANDS.txt](C:/xampp/htdocs/xplabs/windows/DEPLOY_COMMANDS.txt)
 

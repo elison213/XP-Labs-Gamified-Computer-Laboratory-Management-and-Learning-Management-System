@@ -31,7 +31,7 @@ class CorsMiddleware
         // Preflight request handling
         if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
             header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
-            header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Machine-Key, X-Kiosk-Token, X-CSRF-Token, X-Requested-With');
+            header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Machine-Key, X-Requested-With');
             header('Access-Control-Max-Age: 3600');
             http_response_code(204);
             exit;

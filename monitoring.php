@@ -7,18 +7,24 @@ require_once __DIR__ . '/includes/bootstrap.php';
 use XPLabs\Lib\Auth;
 use XPLabs\Lib\Database;
 use XPLabs\Services\LabService;
-use XPLabs\Services\PCService;
 
 Auth::requireRole(['admin', 'teacher']);
 
 $db = Database::getInstance();
 $labService = new LabService();
-$pcService = new PCService();
 
 $floors = $labService->getFloors();
 $stations = $labService->getStations();
 $stats = $labService->getStats();
-$unassignedPcCount = $pcService->getUnassignedCount();
+if ($db->tableExists('ad_computers')) {
+    $adStats = [
+        'computers' => (int) $db->fetchOne("SELECT COUNT(*) FROM ad_computers"),
+        'users' => (int) $db->fetchOne("SELECT COUNT(*) FROM ad_users"),
+        'groups' => (int) $db->fetchOne("SELECT COUNT(*) FROM ad_groups"),
+    ];
+} else {
+    $adStats = ['computers' => 0, 'users' => 0, 'groups' => 0];
+}
 
 // Group stations by floor
 $stationsByFloor = [];
@@ -110,35 +116,10 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
         }
         .stat-dot.green { background: var(--green); box-shadow: 0 0 8px var(--green); }
         .stat-dot.yellow { background: var(--yellow); }
-        .stat-dot.orange { background: var(--orange); }
         .stat-dot.red { background: var(--red); }
         .stat-dot.gray { background: var(--gray); }
         .stat-count { font-weight: 700; font-size: 1.1rem; color: var(--text); }
         .stat-label { font-size: 0.75rem; color: var(--text-muted); }
-
-        .monitor-content-offset {
-            margin-left: 260px;
-            width: calc(100% - 260px);
-        }
-        .monitor-alert-strip {
-            padding: 0.75rem 1.5rem 0;
-        }
-        .monitor-alert-strip .alert {
-            margin: 0;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 0.75rem;
-            border-radius: 10px;
-        }
-        .monitor-alert-strip .alert-message {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            flex: 1;
-            min-width: 200px;
-        }
 
         /* Floor Tabs */
         .floor-tabs {
@@ -261,7 +242,6 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
         .seat-plan-card:hover { transform: scale(1.02); border-color: var(--accent); }
         .seat-plan-card.active { border-color: var(--green); background: rgba(34, 197, 94, 0.1); }
         .seat-plan-card.idle { border-color: var(--yellow); background: rgba(234, 179, 8, 0.05); }
-        .seat-plan-card.locked { border-color: var(--orange); background: rgba(249, 115, 22, 0.08); }
         .seat-plan-card.offline { border-color: var(--gray); opacity: 0.5; }
         .seat-plan-card.maintenance { border-color: var(--red); background: rgba(239, 68, 68, 0.1); }
         .seat-plan-card .seat-status {
@@ -270,7 +250,6 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
         }
         .seat-plan-card .seat-status.active { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2s infinite; }
         .seat-plan-card .seat-status.idle { background: var(--yellow); }
-        .seat-plan-card .seat-status.locked { background: var(--orange); }
         .seat-plan-card .seat-status.offline { background: var(--gray); }
         .seat-plan-card .seat-status.maintenance { background: var(--red); }
         .seat-plan-card .seat-icon { font-size: 1.25rem; margin-bottom: 0.25rem; }
@@ -320,7 +299,6 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
         .seat-card:hover { transform: translateY(-2px); border-color: var(--accent); }
         .seat-card.active { border-color: var(--green); background: rgba(34, 197, 94, 0.1); }
         .seat-card.idle { border-color: var(--yellow); background: rgba(234, 179, 8, 0.05); }
-        .seat-card.locked { border-color: var(--orange); background: rgba(249, 115, 22, 0.08); }
         .seat-card.offline { border-color: var(--gray); opacity: 0.6; }
         .seat-card.maintenance { border-color: var(--red); background: rgba(239, 68, 68, 0.1); }
         
@@ -334,7 +312,6 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
         }
         .seat-status.active { background: var(--green); box-shadow: 0 0 10px var(--green); animation: pulse 2s infinite; }
         .seat-status.idle { background: var(--yellow); }
-        .seat-status.locked { background: var(--orange); }
         .seat-status.offline { background: var(--gray); }
         .seat-status.maintenance { background: var(--red); }
         
@@ -493,13 +470,6 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
         </div>
     </div>
     <div class="stat-chip">
-        <div class="stat-dot orange"></div>
-        <div>
-            <div class="stat-count" id="stat-locked"><?= (int) ($stats['locked'] ?? 0) ?></div>
-            <div class="stat-label">Locked</div>
-        </div>
-    </div>
-    <div class="stat-chip">
         <div class="stat-dot gray"></div>
         <div>
             <div class="stat-count" id="stat-offline"><?= $stats['offline'] ?></div>
@@ -515,11 +485,11 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
     </div>
     <div class="stat-chip ms-auto">
         <div>
-            <div class="stat-count" id="stat-total"><?= $stats['total'] ?></div>
+            <div class="stat-count"><?= $stats['total'] ?></div>
             <div class="stat-label">Total Stations</div>
         </div>
     </div>
-    <?php if (false): /* AD stats removed */ ?>
+    <!-- AD Stats -->
     <div class="stat-chip">
         <div class="stat-dot" style="background:#4a90e2;"></div>
         <div>
@@ -541,31 +511,41 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
             <div class="stat-label">AD Groups</div>
         </div>
     </div>
-    <?php endif; ?>
-    <?php if ($unassignedPcCount > 0): ?>
-    <div class="stat-chip">
-        <div class="stat-dot" style="background:#f97316;"></div>
-        <div>
-            <div class="stat-count"><?= (int) $unassignedPcCount ?></div>
-            <div class="stat-label">Unassigned PCs</div>
-        </div>
-    </div>
-</div>
-    <?php endif; ?>
-
-    <?php if ($unassignedPcCount > 0): ?>
-    <div class="monitor-content-offset monitor-alert-strip">
-        <div class="alert alert-warning" role="alert">
-            <div class="alert-message">
-                <i class="bi bi-exclamation-triangle-fill"></i>
-                <span><strong><?= (int) $unassignedPcCount ?></strong> discovered PC<?= $unassignedPcCount === 1 ? '' : 's' ?> need floor/station assignment before they appear on the seat plan.</span>
+        <div class="stat-chip">
+            <div class="stat-dot green"></div>
+            <div>
+                <div class="stat-count" id="stat-active"><?= $stats['active'] ?></div>
+                <div class="stat-label">Active</div>
             </div>
-            <a href="dashboard_lab_pcs.php" class="btn btn-sm btn-warning">
-                <i class="bi bi-pc-display me-1"></i> Open Lab PC Management
-            </a>
+        </div>
+        <div class="stat-chip">
+            <div class="stat-dot yellow"></div>
+            <div>
+                <div class="stat-count" id="stat-idle"><?= $stats['idle'] ?></div>
+                <div class="stat-label">Idle</div>
+            </div>
+        </div>
+        <div class="stat-chip">
+            <div class="stat-dot gray"></div>
+            <div>
+                <div class="stat-count" id="stat-offline"><?= $stats['offline'] ?></div>
+                <div class="stat-label">Offline</div>
+            </div>
+        </div>
+        <div class="stat-chip">
+            <div class="stat-dot red"></div>
+            <div>
+                <div class="stat-count" id="stat-maintenance"><?= $stats['maintenance'] ?></div>
+                <div class="stat-label">Maintenance</div>
+            </div>
+        </div>
+        <div class="stat-chip ms-auto">
+            <div>
+                <div class="stat-count"><?= $stats['total'] ?></div>
+                <div class="stat-label">Total Stations</div>
+            </div>
         </div>
     </div>
-    <?php endif; ?>
 
     <!-- Floor Tabs -->
     <div class="floor-tabs">
@@ -602,7 +582,6 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
                 <button class="filter-btn active" data-filter="all">All</button>
                 <button class="filter-btn" data-filter="active">Active</button>
                 <button class="filter-btn" data-filter="idle">Idle</button>
-                <button class="filter-btn" data-filter="locked">Locked</button>
                 <button class="filter-btn" data-filter="offline">Offline</button>
                 <button class="filter-btn" data-filter="maintenance">Maintenance</button>
             </div>
@@ -616,7 +595,7 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
                     $user = trim(($station['first_name'] ?? '') . ' ' . ($station['last_name'] ?? ''));
                     $task = $station['task'] ?? '';
                 ?>
-                <div class="seat-card <?= $status ?>" data-status="<?= $status ?>" data-station-id="<?= $station['id'] ?>" data-pc-id="<?= (int) ($station['pc_id'] ?? 0) ?>" data-user="<?= e($user) ?>" data-task="<?= e($task) ?>">
+                <div class="seat-card <?= $status ?>" data-status="<?= $status ?>" data-station-id="<?= $station['id'] ?>" data-user="<?= e($user) ?>" data-task="<?= e($task) ?>">
                     <div class="seat-status <?= $status ?>"></div>
                     <div class="seat-icon">
                         <?php if ($status === 'active'): ?>
@@ -683,7 +662,7 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
                             $status = $station['status'] ?? 'offline';
                             $user = trim(($station['first_name'] ?? '') . ' ' . ($station['last_name'] ?? ''));
                         ?>
-                        <div class="seat-plan-card <?= $status ?>" data-station-id="<?= $station['id'] ?>" data-pc-id="<?= (int) ($station['pc_id'] ?? 0) ?>" data-user="<?= e($user) ?>" data-task="<?= e($station['task'] ?? '') ?>">
+                        <div class="seat-plan-card <?= $status ?>" data-station-id="<?= $station['id'] ?>" data-user="<?= e($user) ?>" data-task="<?= e($station['task'] ?? '') ?>">
                             <div class="seat-status <?= $status ?>"></div>
                             <div class="seat-icon">
                                 <?php if ($status === 'active'): ?>
@@ -770,47 +749,12 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
         </div>
     </div>
 
-    <div class="modal fade" id="monitorMessageModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content" style="background: var(--bg-panel); border: 1px solid var(--border);">
-                <div class="modal-header border-secondary"><h5 class="modal-title">Message PC</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
-                <div class="modal-body">
-                    <input type="hidden" id="monitorMsgPcId">
-                    <textarea class="form-control" id="monitorMsgText" rows="3" placeholder="Message…"></textarea>
-                </div>
-                <div class="modal-footer border-secondary">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" onclick="sendMonitoringPcMessage()">Send</button>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="modal fade" id="monitorThreadsModal" tabindex="-1">
-        <div class="modal-dialog modal-lg modal-dialog-scrollable">
-            <div class="modal-content" style="background: var(--bg-panel); border: 1px solid var(--border);">
-                <div class="modal-header border-secondary"><h5 class="modal-title">PC chats</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
-                <div class="modal-body">
-                    <input type="hidden" id="monitorThreadsPcId">
-                    <div id="monitorThreadsList" class="list-group mb-3 small"></div>
-                    <div id="monitorThreadMessages" class="border rounded p-2 small" style="min-height: 160px; max-height: 280px; overflow-y: auto;"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-    const csrfToken = <?= json_encode(\csrf_token()) ?>;
-    const actorId = <?= json_encode(\XPLabs\Lib\Auth::id()) ?>;
-    const appBase = <?= json_encode(rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? '/xplabs/monitoring.php'), '/')) ?>;
-    const apiPhpUrl = (path) => `${appBase}${path}.php`;
-    const currentFloorId = <?= json_encode($currentFloorId) ?>;
-    document.getElementById('btn-refresh')?.addEventListener('click', refreshData);
     // Station detail panel
     document.querySelectorAll('.seat-card').forEach(card => {
         card.addEventListener('click', function() {
             const id = this.dataset.stationId;
-            const pcId = Number(this.dataset.pcId || 0);
             const status = this.dataset.status;
             const user = this.dataset.user || 'None';
             const task = this.dataset.task || 'None';
@@ -819,7 +763,6 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
             const statusColors = {
                 active: 'text-success',
                 idle: 'text-warning',
-                locked: 'text-warning',
                 offline: 'text-secondary',
                 maintenance: 'text-danger'
             };
@@ -846,23 +789,6 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
                     <div class="detail-row">
                         <span class="detail-label">Task</span>
                         <span class="detail-value">${task}</span>
-                    </div>
-                    <div class="mt-3 d-flex flex-wrap gap-2">
-                        <button class="action-btn success" onclick="queuePcCommand(${pcId}, 'unlock')" ${pcId > 0 ? '' : 'disabled'}>
-                            <i class="bi bi-unlock"></i> Unlock
-                        </button>
-                        <button class="action-btn danger" onclick="queuePcCommand(${pcId}, 'lock')" ${pcId > 0 ? '' : 'disabled'}>
-                            <i class="bi bi-lock"></i> Lock
-                        </button>
-                        <button class="action-btn danger" onclick="queuePcCommand(${pcId}, 'shutdown')" ${pcId > 0 ? '' : 'disabled'}>
-                            <i class="bi bi-power"></i> Shutdown
-                        </button>
-                        <button class="action-btn" onclick="openMonitoringMessage(${pcId})" ${pcId > 0 ? '' : 'disabled'}>
-                            <i class="bi bi-chat-text"></i> Message
-                        </button>
-                        <button class="action-btn" onclick="openMonitoringThreads(${pcId})" ${pcId > 0 ? '' : 'disabled'}>
-                            <i class="bi bi-chat-dots"></i> Chats
-                        </button>
                     </div>
                 </div>
             `;
@@ -898,22 +824,17 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
         btn.disabled = true;
         
         try {
-            const response = await fetch(`${apiPhpUrl('/api/lab/stations')}?floor_id=${encodeURIComponent(currentFloorId)}`);
+            const response = await fetch('/api/lab/stations');
             const data = await response.json();
             if (data.stations) {
                 // Update stats
-                const stats = { active: 0, idle: 0, locked: 0, offline: 0, maintenance: 0 };
+                const stats = { active: 0, idle: 0, offline: 0, maintenance: 0 };
                 data.stations.forEach(s => { if (stats[s.status] !== undefined) stats[s.status]++; });
                 
                 document.getElementById('stat-active').textContent = stats.active;
                 document.getElementById('stat-idle').textContent = stats.idle;
-                document.getElementById('stat-locked').textContent = stats.locked;
                 document.getElementById('stat-offline').textContent = stats.offline;
                 document.getElementById('stat-maintenance').textContent = stats.maintenance;
-                document.getElementById('stat-total').textContent = data.stations.length;
-                // Keep UI fully consistent: server-render floor cards/plan are refreshed together.
-                location.reload();
-                return;
             }
         } catch (e) {
             console.warn('Refresh failed:', e);
@@ -941,8 +862,7 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
     document.querySelectorAll('.seat-plan-card').forEach(card => {
         card.addEventListener('click', function() {
             const id = this.dataset.stationId;
-            const pcId = Number(this.dataset.pcId || 0);
-            const status = this.dataset.status || this.className.match(/(active|idle|locked|offline|maintenance)/)?.[1] || 'offline';
+            const status = this.dataset.status || this.className.match(/(active|idle|offline|maintenance)/)?.[1] || 'offline';
             const user = this.dataset.user || 'None';
             const task = this.dataset.task || 'None';
             const number = this.querySelector('.seat-number')?.textContent || '';
@@ -950,7 +870,6 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
             const statusColors = {
                 active: 'text-success',
                 idle: 'text-warning',
-                locked: 'text-warning',
                 offline: 'text-secondary',
                 maintenance: 'text-danger'
             };
@@ -978,149 +897,10 @@ foreach ($floors as $f) { if ($f['id'] == $currentFloorId) { $currentFloor = $f;
                         <span class="detail-label">Task</span>
                         <span class="detail-value">${task}</span>
                     </div>
-                    <div class="mt-3 d-flex flex-wrap gap-2">
-                        <button class="action-btn success" onclick="queuePcCommand(${pcId}, 'unlock')" ${pcId > 0 ? '' : 'disabled'}>
-                            <i class="bi bi-unlock"></i> Unlock
-                        </button>
-                        <button class="action-btn danger" onclick="queuePcCommand(${pcId}, 'lock')" ${pcId > 0 ? '' : 'disabled'}>
-                            <i class="bi bi-lock"></i> Lock
-                        </button>
-                        <button class="action-btn danger" onclick="queuePcCommand(${pcId}, 'shutdown')" ${pcId > 0 ? '' : 'disabled'}>
-                            <i class="bi bi-power"></i> Shutdown
-                        </button>
-                        <button class="action-btn" onclick="openMonitoringMessage(${pcId})" ${pcId > 0 ? '' : 'disabled'}>
-                            <i class="bi bi-chat-text"></i> Message
-                        </button>
-                        <button class="action-btn" onclick="openMonitoringThreads(${pcId})" ${pcId > 0 ? '' : 'disabled'}>
-                            <i class="bi bi-chat-dots"></i> Chats
-                        </button>
-                    </div>
                 </div>
             `;
         });
     });
-
-    let monitorPoll = null;
-    let monitorThreadSel = null;
-
-    function openMonitoringMessage(pcId) {
-        document.getElementById('monitorMsgPcId').value = pcId;
-        document.getElementById('monitorMsgText').value = '';
-        new bootstrap.Modal(document.getElementById('monitorMessageModal')).show();
-    }
-
-    async function sendMonitoringPcMessage() {
-        const pcId = Number(document.getElementById('monitorMsgPcId').value);
-        const message = document.getElementById('monitorMsgText').value.trim();
-        if (!message || !pcId) return;
-        try {
-            const res = await fetch(apiPhpUrl('/api/lab/pc-message'), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-                body: JSON.stringify({ pc_id: pcId, message })
-            });
-            const data = await res.json();
-            if (data.success) {
-                bootstrap.Modal.getInstance(document.getElementById('monitorMessageModal')).hide();
-                alert('Message sent (thread #' + (data.thread_id || '') + ')');
-            } else {
-                alert(data.error || 'Failed');
-            }
-        } catch (e) {
-            alert('Failed to send message');
-        }
-    }
-
-    function openMonitoringThreads(pcId) {
-        document.getElementById('monitorThreadsPcId').value = pcId;
-        monitorThreadSel = null;
-        document.getElementById('monitorThreadMessages').innerHTML = '<span class="text-muted">Select a thread</span>';
-        new bootstrap.Modal(document.getElementById('monitorThreadsModal')).show();
-        loadMonitorThreads(pcId);
-        if (monitorPoll) clearInterval(monitorPoll);
-        monitorPoll = setInterval(() => {
-            if (!document.getElementById('monitorThreadsModal').classList.contains('show')) return;
-            loadMonitorThreads(pcId, true);
-            if (monitorThreadSel) loadMonitorThreadMsgs(monitorThreadSel, true);
-        }, 5000);
-    }
-
-    document.getElementById('monitorThreadsModal')?.addEventListener('hidden.bs.modal', () => {
-        if (monitorPoll) { clearInterval(monitorPoll); monitorPoll = null; }
-    });
-
-    async function loadMonitorThreads(pcId, silent) {
-        try {
-            const res = await fetch(apiPhpUrl('/api/lab/pc-messages') + '?pc_id=' + encodeURIComponent(pcId));
-            const data = await res.json();
-            const el = document.getElementById('monitorThreadsList');
-            if (!data.success || !data.threads || !data.threads.length) {
-                el.innerHTML = '<div class="text-muted">No threads yet.</div>';
-                return;
-            }
-            el.innerHTML = data.threads.map(t =>
-                `<button type="button" class="list-group-item list-group-item-action ${monitorThreadSel === t.id ? 'active' : ''}" onclick="selectMonitorThread(${t.id})">#${t.id} · ${t.first_name} ${t.last_name}</button>`
-            ).join('');
-        } catch (e) {
-            if (!silent) console.warn(e);
-        }
-    }
-
-    async function selectMonitorThread(tid) {
-        monitorThreadSel = tid;
-        const pcId = document.getElementById('monitorThreadsPcId').value;
-        await loadMonitorThreads(pcId, true);
-        await loadMonitorThreadMsgs(tid);
-    }
-
-    async function loadMonitorThreadMsgs(threadId, silent) {
-        try {
-            const res = await fetch(apiPhpUrl('/api/lab/pc-messages') + '?thread_id=' + encodeURIComponent(threadId));
-            const data = await res.json();
-            const box = document.getElementById('monitorThreadMessages');
-            if (!data.success || !data.messages) {
-                box.innerHTML = '';
-                return;
-            }
-            const esc = (s) => {
-                const d = document.createElement('div');
-                d.textContent = s == null ? '' : String(s);
-                return d.innerHTML;
-            };
-            box.innerHTML = data.messages.map(m => {
-                const who = m.sender_role === 'student' ? 'Student' : 'Instructor';
-                const name = ((m.first_name || '') + ' ' + (m.last_name || '')).trim();
-                return `<div class="mb-2"><span class="badge bg-secondary">${who}</span> ${esc(name)} <small class="text-muted">${esc(m.created_at)}</small><div>${esc(m.body)}</div></div>`;
-            }).join('');
-        } catch (e) {
-            if (!silent) console.warn(e);
-        }
-    }
-
-    async function queuePcCommand(pcId, commandType) {
-        if (!pcId || pcId <= 0) {
-            alert('No PC is assigned to this station yet.');
-            return;
-        }
-        if (commandType === 'shutdown' && !confirm('Shutdown this PC now?')) {
-            return;
-        }
-        try {
-            const response = await fetch(apiPhpUrl('/api/lab/queue-command'), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-                body: JSON.stringify({ pc_id: pcId, command_type: commandType, issued_by: actorId })
-            });
-            const data = await response.json();
-            if (!data.success) {
-                throw new Error(data.error || 'Command failed');
-            }
-            alert(`${commandType} command sent.`);
-            setTimeout(refreshData, 800);
-        } catch (e) {
-            alert(`Failed to send ${commandType}: ${e.message || e}`);
-        }
-    }
 
     // Auto-refresh every 10 seconds
     setInterval(refreshData, 10000);

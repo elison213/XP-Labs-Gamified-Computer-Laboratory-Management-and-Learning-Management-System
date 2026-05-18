@@ -13,7 +13,6 @@ class AttendanceService
 {
     private Database $db;
     private PointService $pointService;
-    private int $heartbeatOfflineThresholdSeconds = 300;
 
     public function __construct()
     {
@@ -126,9 +125,9 @@ class AttendanceService
             $this->pointService->awardPoints($userId, $points, 'attendance_full_session', 'attendance_session', $sessionId);
         }
 
-        // Free up the station. If a mapped PC is still online, keep station idle.
+        // Free up the station
         if ($assignment['station_id']) {
-            $this->updateStationStatusAfterCheckout((int) $assignment['station_id']);
+            $this->db->update('lab_stations', ['status' => 'offline'], 'id = ?', [$assignment['station_id']]);
         }
 
         return ['success' => true, 'duration_minutes' => round($durationMinutes)];
@@ -162,37 +161,6 @@ class AttendanceService
         );
 
         return $this->db->update('attendance_sessions', ['status' => 'closed'], 'id = ?', [$sessionId]) > 0;
-    }
-
-    private function updateStationStatusAfterCheckout(int $stationId): void
-    {
-        $pc = $this->db->fetch(
-            "SELECT id, status, last_heartbeat FROM lab_pcs WHERE station_id = ? ORDER BY COALESCE(last_heartbeat, updated_at) DESC LIMIT 1",
-            [$stationId]
-        );
-        if (!$pc) {
-            $this->db->update('lab_stations', ['status' => 'offline'], 'id = ?', [$stationId]);
-            return;
-        }
-
-        $pcStatus = strtolower(trim((string) ($pc['status'] ?? 'offline')));
-        $heartbeatTs = strtotime((string) ($pc['last_heartbeat'] ?? ''));
-        if ($heartbeatTs === false || (time() - $heartbeatTs) > $this->heartbeatOfflineThresholdSeconds) {
-            $this->db->update('lab_stations', ['status' => 'offline'], 'id = ?', [$stationId]);
-            return;
-        }
-
-        if (in_array($pcStatus, ['online', 'idle', 'locked'], true)) {
-            $this->db->update('lab_stations', ['status' => 'idle'], 'id = ?', [$stationId]);
-            return;
-        }
-
-        if ($pcStatus === 'maintenance') {
-            $this->db->update('lab_stations', ['status' => 'maintenance'], 'id = ?', [$stationId]);
-            return;
-        }
-
-        $this->db->update('lab_stations', ['status' => 'offline'], 'id = ?', [$stationId]);
     }
 
     /**

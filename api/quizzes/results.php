@@ -32,12 +32,6 @@ $quizService = new QuizService();
 $db = Database::getInstance();
 $userId = Auth::id();
 $role = $_SESSION['user_role'] ?? '';
-$hasAttemptIsPreview = (int) $db->fetchOne(
-    "SELECT COUNT(*) FROM information_schema.columns
-     WHERE table_schema = DATABASE()
-       AND table_name = 'quiz_attempts'
-       AND column_name = 'is_preview'"
-) > 0;
 
 if ($attemptId > 0) {
     $attempt = $db->fetch("SELECT * FROM quiz_attempts WHERE id = ?", [$attemptId]);
@@ -101,7 +95,7 @@ $attempts = $db->fetchAll(
             CASE WHEN qa.max_score > 0 THEN ROUND((qa.total_score / qa.max_score) * 100, 2) ELSE 0 END AS score_percentage
      FROM quiz_attempts qa
      JOIN users u ON qa.user_id = u.id
-     WHERE qa.quiz_id = ? AND qa.status = 'completed'" . ($hasAttemptIsPreview ? " AND COALESCE(qa.is_preview, 0) = 0" : "") . "
+     WHERE qa.quiz_id = ? AND qa.status = 'completed'
      ORDER BY score_percentage DESC, qa.finished_at DESC",
     [$quizId]
 );

@@ -17,13 +17,6 @@ $db = Database::getInstance();
 $userId = Auth::id();
 $role = Auth::role();
 $courseId = (int) ($_GET['course_id'] ?? 0);
-$hasAttemptIsPreview = (int) $db->fetchOne(
-    "SELECT COUNT(*) FROM information_schema.columns
-     WHERE table_schema = DATABASE()
-       AND table_name = 'quiz_attempts'
-       AND column_name = 'is_preview'"
-) > 0;
-$attemptPreviewFilter = $hasAttemptIsPreview ? " AND COALESCE(qa.is_preview, 0) = 0" : "";
 
 // Build query based on role and selected course.
 $where = "1=1";
@@ -54,7 +47,7 @@ $quizzes = $db->fetchAll(
             COALESCE(AVG(CASE WHEN qa.max_score > 0 THEN (qa.total_score / qa.max_score) * 100 ELSE 0 END), 0) as avg_score,
             COUNT(qa.id) as attempts
      FROM quizzes q
-     LEFT JOIN quiz_attempts qa ON q.id = qa.quiz_id AND qa.status = 'completed'" . $attemptPreviewFilter . "
+     LEFT JOIN quiz_attempts qa ON q.id = qa.quiz_id AND qa.status = 'completed'
      WHERE $where
      GROUP BY q.id
      ORDER BY q.created_at DESC
@@ -71,7 +64,7 @@ $dist = $db->fetch(
         SUM(CASE WHEN (CASE WHEN qa.max_score > 0 THEN (qa.total_score / qa.max_score) * 100 ELSE 0 END) < 60 THEN 1 ELSE 0 END) as poor
      FROM quiz_attempts qa
      JOIN quizzes q ON qa.quiz_id = q.id
-     WHERE qa.status = 'completed'" . $attemptPreviewFilter . " AND $where",
+     WHERE qa.status = 'completed' AND $where",
     $params
 );
 
@@ -80,7 +73,7 @@ $avgScore = $db->fetch(
     "SELECT COALESCE(AVG(CASE WHEN qa.max_score > 0 THEN (qa.total_score / qa.max_score) * 100 ELSE 0 END), 0) as avg
      FROM quiz_attempts qa
      JOIN quizzes q ON qa.quiz_id = q.id
-     WHERE qa.status = 'completed'" . $attemptPreviewFilter . " AND $where",
+     WHERE qa.status = 'completed' AND $where",
     $params
 );
 

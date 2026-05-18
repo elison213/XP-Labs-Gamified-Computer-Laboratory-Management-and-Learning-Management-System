@@ -27,12 +27,6 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 $pc = MachineAuth::require();
 
 $role = trim($_GET['role'] ?? 'student');
-$allowedRoles = ['student', 'teacher', 'admin'];
-if (!in_array($role, $allowedRoles, true)) {
-    http_response_code(400);
-    echo json_encode(['error' => 'Invalid role']);
-    exit;
-}
 
 $pcService = new PCService();
 $rules = $pcService->getFolderRules($pc['floor_id'], $role);

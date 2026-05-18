@@ -12,11 +12,3 @@ Desktop.ini
 # Dependencies / build artifacts (if ever added)
 vendor/
 node_modules/
-
-# Third-party reference (not part of XPLabs app)
-MeshCentral-master/
-
-# .NET build output
-windows/**/bin/
-windows/**/obj/
-dist/

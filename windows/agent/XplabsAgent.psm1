@@ -1,10 +1,5 @@
 Set-StrictMode -Version Latest
 
-$userSessionModule = Join-Path $PSScriptRoot 'XplabsUserSession.psm1'
-if (Test-Path $userSessionModule) {
-  Import-Module $userSessionModule -Force -DisableNameChecking
-}
-
 function Get-XplabsPaths {
   $programDir = Join-Path $env:ProgramFiles 'XPLabsAgent'
   $dataDir = Join-Path $env:ProgramData 'XPLabsAgent'
@@ -17,11 +12,7 @@ function Get-XplabsPaths {
     KeyPath    = Join-Path $dataDir 'machine_key.txt'
     StatePath  = Join-Path $dataDir 'state.json'
     OverrideRequestPath = Join-Path $dataDir 'override_request.json'
-    StudentLoginRequestPath = Join-Path $dataDir 'student_login_request.json'
     LockRequestPath = Join-Path $dataDir 'lock_request.json'
-    ShowLockscreenDemandPath = Join-Path $dataDir 'show_lockscreen_demand.json'
-    AdminHotkeyRequestPath = Join-Path $dataDir 'admin_hotkey_request.json'
-    PendingMessagesPath = Join-Path $dataDir 'pending_messages.json'
     HeartbeatSpoolDir = Join-Path $dataDir 'heartbeat-spool'
     DebugLogPath = Join-Path $logDir 'agent-debug.log'
     LogPath    = Join-Path $logDir 'agent.log'
@@ -157,42 +148,6 @@ function Get-XplabsConfig {
   return $cfg
 }
 
-function Send-XplabsStatusHeartbeat {
-  param(
-    [Parameter(Mandatory)]
-    [ValidateSet('locked', 'online', 'idle')]
-    [string] $Status,
-    [string] $MachineKey = $null
-  )
-  try {
-    if ([string]::IsNullOrWhiteSpace($MachineKey)) {
-      $MachineKey = Get-XplabsMachineKey
-    }
-    if ([string]::IsNullOrWhiteSpace($MachineKey)) { return $false }
-
-    $state = Get-AgentState
-    $cursor = 0
-    try {
-      if ($null -ne $state.last_command_cursor) { $cursor = [int64]$state.last_command_cursor }
-    } catch {}
-
-    $body = @{
-      heartbeat_id       = [guid]::NewGuid().ToString('N')
-      command_cursor     = $cursor
-      status             = $Status
-      active_users       = @()
-      system_info        = (Get-SystemInfo)
-      protocol_version   = (Get-XplabsProtocolVersion)
-    }
-    Invoke-XplabsApi -Method 'POST' -Path '/api/pc/heartbeat.php' -Body $body -MachineKey $MachineKey | Out-Null
-    Write-XplabsLog -Level info -Message "Server status sync: $Status"
-    return $true
-  } catch {
-    Write-XplabsLog -Level warn -Message "Server status sync failed ($Status): $($_.Exception.Message)"
-    return $false
-  }
-}
-
 function Get-XplabsMachineKey {
   $p = Get-XplabsPaths
   if (-not (Test-Path $p.KeyPath)) { return $null }
@@ -229,7 +184,7 @@ function Invoke-XplabsApi {
       $p = "$p.php"
     }
     if ($null -ne $qs -and $qs -ne '') {
-      return "${p}?$qs"
+      return "$p?$qs"
     }
     return $p
   }
@@ -428,35 +383,7 @@ function Get-AgentState {
       last_unlock_at = $null
       last_validate_at = $null
       last_server_time = $null
-      last_override_status = ''
-      last_override_message = ''
-      override_unlock_until = ''
     }
-  }
-  $requiredDefaults = @{
-    locked = $true
-    last_lrn = $null
-    last_unlock_at = $null
-    last_validate_at = $null
-    last_server_time = $null
-    last_ack_id = ''
-    last_command_cursor = 0
-    last_success_at = ''
-    consecutive_failures = 0
-    next_retry_hint = $null
-    last_override_status = ''
-    last_override_message = ''
-    override_unlock_until = ''
-  }
-  $changed = $false
-  foreach ($name in $requiredDefaults.Keys) {
-    if (-not ($state.PSObject.Properties.Name -contains $name)) {
-      $state | Add-Member -NotePropertyName $name -NotePropertyValue $requiredDefaults[$name]
-      $changed = $true
-    }
-  }
-  if ($changed) {
-    Set-AgentState -State $state
   }
   return $state
 }
@@ -465,45 +392,6 @@ function Set-AgentState {
   param([Parameter(Mandatory)] $State)
   $p = Get-XplabsPaths
   Write-XplabsJsonFile -Path $p.StatePath -Object $State
-}
-
-function Get-WindowsLastBootTimeIso {
-  try {
-    return (Get-CimInstance Win32_OperatingSystem -ErrorAction Stop).LastBootUpTime.ToString('o')
-  } catch {
-    return ''
-  }
-}
-
-function Test-ShouldApplyBootLock {
-  # Only once per Windows boot — NOT on every agent loop restart (schtasks /Run).
-  $boot = Get-WindowsLastBootTimeIso
-  if ([string]::IsNullOrWhiteSpace($boot)) { return $false }
-
-  $p = Get-XplabsPaths
-  $markerPath = Join-Path $p.DataDir 'last_boot_lock_applied.txt'
-  if (Test-Path $markerPath) {
-    $last = (Get-Content -LiteralPath $markerPath -Raw -ErrorAction SilentlyContinue).Trim()
-    if ($last -eq $boot) { return $false }
-  }
-
-  try {
-    Set-Content -LiteralPath $markerPath -Value $boot -Encoding ASCII -Force
-  } catch {
-    Write-XplabsLog -Level warn -Message "Could not write boot lock marker: $($_.Exception.Message)"
-  }
-  return $true
-}
-
-function Initialize-BootLockState {
-  # Reboot / power-on always returns to locked lab mode (override grace does not persist).
-  $state = Get-AgentState
-  $state.locked = $true
-  if ($state.PSObject.Properties.Name -contains 'override_unlock_until') {
-    $state.override_unlock_until = ''
-  }
-  Set-AgentState -State $state
-  return $state
 }
 
 function Get-OverrideRequest {
@@ -515,18 +403,6 @@ function Clear-OverrideRequest {
   $p = Get-XplabsPaths
   if (Test-Path $p.OverrideRequestPath) {
     Remove-Item -Path $p.OverrideRequestPath -Force -ErrorAction SilentlyContinue
-  }
-}
-
-function Get-StudentLoginRequest {
-  $p = Get-XplabsPaths
-  return Read-XplabsJsonFile -Path $p.StudentLoginRequestPath
-}
-
-function Clear-StudentLoginRequest {
-  $p = Get-XplabsPaths
-  if (Test-Path $p.StudentLoginRequestPath) {
-    Remove-Item -Path $p.StudentLoginRequestPath -Force -ErrorAction SilentlyContinue
   }
 }
 
@@ -542,161 +418,6 @@ function Clear-LockRequest {
   }
 }
 
-function Get-AdminHotkeyRequest {
-  $p = Get-XplabsPaths
-  return Read-XplabsJsonFile -Path $p.AdminHotkeyRequestPath
-}
-
-function Clear-AdminHotkeyRequest {
-  $p = Get-XplabsPaths
-  if (Test-Path $p.AdminHotkeyRequestPath) {
-    Remove-Item -Path $p.AdminHotkeyRequestPath -Force -ErrorAction SilentlyContinue
-  }
-}
-
-function Get-PendingMessages {
-  $p = Get-XplabsPaths
-  $raw = Read-XplabsJsonFile -Path $p.PendingMessagesPath
-  if (-not $raw) { return @() }
-  if ($raw -is [System.Array]) { return @($raw) }
-  if ($raw.PSObject.Properties.Name -contains 'messages') {
-    return @($raw.messages)
-  }
-  return @()
-}
-
-function Add-PendingMessage {
-  param(
-    [Parameter(Mandatory)] [int] $CommandId,
-    [Parameter(Mandatory)] [string] $Message,
-    [int] $ThreadId = 0
-  )
-  $p = Get-XplabsPaths
-  $list = @(Get-PendingMessages)
-  $entry = [pscustomobject]@{
-    command_id = $CommandId
-    thread_id  = $ThreadId
-    message    = $Message
-    received_at = (Get-Date).ToString('o')
-  }
-  $list += $entry
-  Write-XplabsJsonFile -Path $p.PendingMessagesPath -Object @{ messages = $list }
-}
-
-function Open-XplabsStudentPortal {
-  try {
-    $cfg = Get-XplabsConfig
-    $base = [string]$cfg.server_base_url
-    if ([string]::IsNullOrWhiteSpace($base)) { return $false }
-    $base = $base.TrimEnd('/')
-    $url = "$base/dashboard_student.php"
-    Start-Process -FilePath $url | Out-Null
-    Write-XplabsLog -Level info -Message "Opened student portal: $url"
-    return $true
-  } catch {
-    Write-XplabsLog -Level warn -Message "Failed to open student portal: $($_.Exception.Message)"
-    return $false
-  }
-}
-
-function Start-XplabsWidget {
-  $p = Get-XplabsPaths
-  $exe = Join-Path $p.ProgramDir 'Widget\XPLabs.Widget.exe'
-  if (-not (Test-Path $exe)) {
-    Write-XplabsLog -Level warn -Message "Widget executable missing: $exe"
-    return $false
-  }
-  if (Test-XplabsWidgetVisibleInUserSession) { return $true }
-  $ok = Invoke-XplabsWidgetInUserSession -AgentDir $p.ProgramDir
-  if ($ok) {
-    Write-XplabsLog -Level info -Message 'Widget visible in user session'
-  } else {
-    Write-XplabsLog -Level warn -Message 'Widget not visible after user-session launch (will retry)'
-  }
-  return $ok
-}
-
-function Test-XplabsOverrideGraceActive {
-  $state = Get-AgentState
-  if (-not $state -or -not ($state.PSObject.Properties.Name -contains 'override_unlock_until')) { return $false }
-  $until = [string]$state.override_unlock_until
-  if ([string]::IsNullOrWhiteSpace($until)) { return $false }
-  try {
-    return (Get-Date) -lt [datetime]::Parse($until)
-  } catch {
-    return $false
-  }
-}
-
-function Invoke-XplabsApplyDesktopSessionLock {
-  param([Parameter(Mandatory)] [string] $MachineKey)
-
-  $state = Get-AgentState
-  $state.locked = $true
-  if ($state.PSObject.Properties.Name -contains 'override_unlock_until') {
-    $state.override_unlock_until = ''
-  }
-  Set-AgentState -State $state
-  Invoke-XplabsAccessCleanup
-  Stop-XplabsUserLockscreen
-  $shown = Start-XplabsLockscreen
-  Send-XplabsStatusHeartbeat -Status 'locked' -MachineKey $MachineKey | Out-Null
-  if ($shown) {
-    Write-XplabsLog -Level info -Message 'Desktop session lock applied; lockscreen visible'
-  } else {
-    Write-XplabsLog -Level warn -Message 'Desktop session lock applied; lockscreen UI not visible yet (retrying)'
-  }
-}
-
-function Request-XplabsShowLockscreen {
-  param([string] $Source = 'agent')
-  $p = Get-XplabsPaths
-  Write-XplabsJsonFile -Path $p.ShowLockscreenDemandPath -Object @{
-    requested_at = (Get-Date).ToString('o')
-    source       = [string]$Source
-  }
-}
-
-function Clear-XplabsShowLockscreenDemand {
-  $p = Get-XplabsPaths
-  if (Test-Path $p.ShowLockscreenDemandPath) {
-    Remove-Item -Path $p.ShowLockscreenDemandPath -Force -ErrorAction SilentlyContinue
-  }
-}
-
-function Start-XplabsLockscreen {
-  $p = Get-XplabsPaths
-  $exe = Join-Path $p.ProgramDir 'LockScreen\XPLabs.LockScreen.exe'
-  if (-not (Test-Path $exe)) {
-    Write-XplabsLog -Level warn -Message "Lockscreen executable missing: $exe"
-    return $false
-  }
-
-  if (Test-XplabsLockscreenVisibleInUserSession) {
-    Clear-XplabsShowLockscreenDemand
-    return $true
-  }
-
-  Stop-XplabsSessionZeroUi
-  Request-XplabsShowLockscreen -Source 'agent'
-
-  $ok = Invoke-XplabsLockscreenInUserSession -AgentDir $p.ProgramDir
-  if ($ok) {
-    Clear-XplabsShowLockscreenDemand
-    Write-XplabsLog -Level info -Message 'Lockscreen visible in user session'
-  } else {
-    Write-XplabsLog -Level warn -Message 'Lockscreen not visible after user-session launch (will retry)'
-  }
-  return $ok
-}
-
-function Get-XplabsArrayOrEmpty {
-  param($Value)
-  if ($null -eq $Value) { return @() }
-  if ($Value -is [System.Array]) { return @($Value) }
-  return @($Value)
-}
-
 function Get-XplabsDriveMappings {
   param(
     [Parameter(Mandatory)] [string] $MachineKey,
@@ -706,9 +427,7 @@ function Get-XplabsDriveMappings {
   )
   $query = "?role=$([uri]::EscapeDataString($Role))&username=$([uri]::EscapeDataString($Username))&lab_name=$([uri]::EscapeDataString($LabName))"
   $res = Invoke-XplabsApi -Method 'GET' -Path "/api/access/drive-maps$query" -MachineKey $MachineKey
-  if ($res -and ($res.PSObject.Properties.Name -contains 'mappings')) {
-    return Get-XplabsArrayOrEmpty -Value $res.mappings
-  }
+  if ($res -and ($res.PSObject.Properties.Name -contains 'mappings')) { return @($res.mappings) }
   return @()
 }
 
@@ -719,9 +438,7 @@ function Get-XplabsFolderRules {
   )
   $query = "?role=$([uri]::EscapeDataString($Role))"
   $res = Invoke-XplabsApi -Method 'GET' -Path "/api/access/folder-rules$query" -MachineKey $MachineKey
-  if ($res -and ($res.PSObject.Properties.Name -contains 'rules')) {
-    return Get-XplabsArrayOrEmpty -Value $res.rules
-  }
+  if ($res -and ($res.PSObject.Properties.Name -contains 'rules')) { return @($res.rules) }
   return @()
 }
 
@@ -791,7 +508,7 @@ function Apply-XplabsFolderRules {
       & icacls.exe $path /grant "${principal}:($perm)" /T /C | Out-Null
       Write-XplabsLog -Level info -Message "ACL applied: path=$path principal=$principal perm=$perm"
     } catch {
-      Write-XplabsLog -Level warn -Message "ACL apply failed path=$path principal=${principal}: $($_.Exception.Message)"
+      Write-XplabsLog -Level warn -Message "ACL apply failed path=$path principal=$principal: $($_.Exception.Message)"
     }
   }
 }
@@ -805,13 +522,13 @@ function Invoke-XplabsAccessApply {
   )
   try {
     $mappings = Get-XplabsDriveMappings -MachineKey $MachineKey -Role $Role -Username $Username -LabName $LabName
-    Apply-XplabsDriveMappings -Mappings @(Get-XplabsArrayOrEmpty -Value $mappings)
+    Apply-XplabsDriveMappings -Mappings $mappings
   } catch {
     Write-XplabsLog -Level warn -Message "Drive mapping apply failed: $($_.Exception.Message)"
   }
   try {
     $rules = Get-XplabsFolderRules -MachineKey $MachineKey -Role $Role
-    Apply-XplabsFolderRules -Rules @(Get-XplabsArrayOrEmpty -Value $rules)
+    Apply-XplabsFolderRules -Rules $rules
   } catch {
     Write-XplabsLog -Level warn -Message "Folder rule apply failed: $($_.Exception.Message)"
   }
@@ -826,5 +543,5 @@ function Invoke-XplabsAccessCleanup {
   }
 }
 
-Export-ModuleMember -Function *-Xplabs*, Get-HostIdentity, Get-SystemInfo, Get-AgentState, Set-AgentState, Initialize-BootLockState, Test-ShouldApplyBootLock, Get-WindowsLastBootTimeIso, Send-XplabsStatusHeartbeat, Get-OverrideRequest, Clear-OverrideRequest, Get-StudentLoginRequest, Clear-StudentLoginRequest, Get-LockRequest, Clear-LockRequest, Get-AdminHotkeyRequest, Clear-AdminHotkeyRequest, Get-PendingMessages, Add-PendingMessage, Open-XplabsStudentPortal, Start-XplabsWidget, Start-XplabsLockscreen, Stop-XplabsSessionZeroUi, Stop-XplabsUserLockscreen, Stop-XplabsSessionZeroLockscreen, Stop-XplabsSessionZeroWidget, Request-XplabsShowLockscreen, Clear-XplabsShowLockscreenDemand, Test-XplabsLockscreenVisibleInUserSession, Test-XplabsWidgetVisibleInUserSession, Test-XplabsScheduledTaskExists, Get-XplabsExplorerSessionId, Get-XplabsInteractiveUserName, Invoke-XplabsLockscreenInUserSession, Invoke-XplabsWidgetInUserSession, Invoke-XplabsApiWithRetry, Queue-XplabsHeartbeatPayload, Get-XplabsQueuedHeartbeats, Read-XplabsQueuedHeartbeat, Remove-XplabsQueuedHeartbeat, Test-XplabsRetryableError, Get-XplabsRetryDelaySeconds, Get-XplabsProtocolVersion, Write-XplabsDebugEvent, Invoke-XplabsDebugRetention, Test-XplabsDebugEnabled, Get-XplabsDebugLevel
+Export-ModuleMember -Function *-Xplabs*, Get-HostIdentity, Get-SystemInfo, Get-AgentState, Set-AgentState, Get-OverrideRequest, Clear-OverrideRequest, Get-LockRequest, Clear-LockRequest, Invoke-XplabsApiWithRetry, Queue-XplabsHeartbeatPayload, Get-XplabsQueuedHeartbeats, Read-XplabsQueuedHeartbeat, Remove-XplabsQueuedHeartbeat, Test-XplabsRetryableError, Get-XplabsRetryDelaySeconds, Get-XplabsProtocolVersion, Write-XplabsDebugEvent, Invoke-XplabsDebugRetention, Test-XplabsDebugEnabled, Get-XplabsDebugLevel
 

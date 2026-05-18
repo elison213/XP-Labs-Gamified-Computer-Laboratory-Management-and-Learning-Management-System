@@ -6,7 +6,6 @@ require_once __DIR__ . '/includes/bootstrap.php';
 
 use XPLabs\Lib\Auth;
 use XPLabs\Lib\Database;
-use XPLabs\Services\AdminLogService;
 use XPLabs\Services\LabService;
 use XPLabs\Services\UserService;
 
@@ -15,7 +14,6 @@ Auth::requireRole('admin');
 $db = Database::getInstance();
 $labService = new LabService();
 $userService = new UserService();
-$adminLogService = new AdminLogService();
 
 // Stats
 $labStats = $labService->getStats();
@@ -217,9 +215,6 @@ $floors = $labService->getFloors();
                 <a href="monitoring.php" class="btn btn-primary">
                     <i class="bi bi-display me-1"></i> Open Lab Monitor
                 </a>
-                <a href="dashboard_lab_pcs.php" class="btn btn-outline-primary">
-                    <i class="bi bi-pc-display-horizontal me-1"></i> Lab Management
-                </a>
             </div>
         </div>
 
@@ -334,7 +329,7 @@ $floors = $labService->getFloors();
                             </div>
                             <div class="activity-content">
                                 <div><strong><?= e($activity['first_name'] . ' ' . $activity['last_name']) ?></strong> - <?= e($activity['action']) ?></div>
-                                <div class="activity-time"><?= e($adminLogService->formatDetailsForDisplay($activity['details'] ?? '')) ?></div>
+                                <div class="activity-time"><?= e($activity['details'] ?? '') ?></div>
                             </div>
                             <div class="activity-time"><?= date('M j, g:i A', strtotime($activity['created_at'])) ?></div>
                         </div>
@@ -373,13 +368,6 @@ $floors = $labService->getFloors();
                             <div>
                                 <div class="fw-semibold">Manage Lab</div>
                                 <small class="text-muted">Add floors & stations</small>
-                            </div>
-                        </a>
-                        <a href="dashboard_lab_pcs.php" class="quick-action">
-                            <i class="bi bi-pc-display-horizontal"></i>
-                            <div>
-                                <div class="fw-semibold">Lab Management Console</div>
-                                <small class="text-muted">Assign PCs and run deployment jobs</small>
                             </div>
                         </a>
                         <a href="announcements.php" class="quick-action">

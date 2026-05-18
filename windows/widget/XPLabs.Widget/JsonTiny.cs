@@ -21,23 +21,6 @@ namespace XPLabs.Widget
             return Regex.Unescape(m.Groups[1].Value);
         }
 
-        public static int TryGetInt(string json, string key, int defaultValue = 0)
-        {
-            if (string.IsNullOrEmpty(json) || string.IsNullOrEmpty(key))
-            {
-                return defaultValue;
-            }
-
-            var pattern = "\"" + Regex.Escape(key) + "\"\\s*:\\s*(-?\\d+)";
-            var m = Regex.Match(json, pattern, RegexOptions.IgnoreCase);
-            if (!m.Success || m.Groups.Count < 2)
-            {
-                return defaultValue;
-            }
-
-            return int.TryParse(m.Groups[1].Value, out var n) ? n : defaultValue;
-        }
-
         public static bool TryGetBool(string json, string key, bool defaultValue = false)
         {
             if (string.IsNullOrEmpty(json) || string.IsNullOrEmpty(key))

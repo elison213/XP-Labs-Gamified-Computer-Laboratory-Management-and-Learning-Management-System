@@ -13,6 +13,7 @@ Auth::requireRole(['admin', 'teacher']);
 $db = Database::getInstance();
 $role = $_SESSION['user_role'];
 $userId = Auth::id();
+$quizService = new QuizService();
 
 // Backward-compatible schema guard for environments where migration 042 has not run yet.
 $hasShowResultsImmediately = (int) $db->fetchOne(
@@ -35,49 +36,6 @@ if (!$hasMaxAttempts) {
     $db->query("ALTER TABLE quizzes ADD COLUMN max_attempts INT DEFAULT 1 AFTER time_limit_per_q");
     $hasMaxAttempts = true;
 }
-$hasIsPreviewAttemptFlag = (int) $db->fetchOne(
-    "SELECT COUNT(*) FROM information_schema.columns
-     WHERE table_schema = DATABASE()
-       AND table_name = 'quiz_attempts'
-       AND column_name = 'is_preview'"
-) > 0;
-
-// Schema guard for per-quiz powerup rules (migration 055)
-$hasQuizPowerupRules = $db->tableExists('quiz_powerup_rules');
-if (!$hasQuizPowerupRules) {
-    $db->query(
-        "CREATE TABLE IF NOT EXISTS quiz_powerup_rules (
-            quiz_id INT NOT NULL,
-            powerup_id INT NOT NULL,
-            is_enabled TINYINT(1) NOT NULL DEFAULT 1,
-            max_uses_per_attempt INT NULL DEFAULT NULL,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY (quiz_id, powerup_id),
-            KEY idx_qpr_quiz (quiz_id),
-            KEY idx_qpr_powerup (powerup_id),
-            CONSTRAINT fk_qpr_quiz FOREIGN KEY (quiz_id) REFERENCES quizzes(id) ON DELETE CASCADE,
-            CONSTRAINT fk_qpr_powerup FOREIGN KEY (powerup_id) REFERENCES powerups(id) ON DELETE CASCADE
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
-    );
-    $hasQuizPowerupRules = true;
-}
-$hasMaxUsesPerAttempt = (int) $db->fetchOne(
-    "SELECT COUNT(*) FROM information_schema.columns
-     WHERE table_schema = DATABASE()
-       AND table_name = 'quiz_powerup_rules'
-       AND column_name = 'max_uses_per_attempt'"
-) > 0;
-if (!$hasMaxUsesPerAttempt) {
-    $db->query("ALTER TABLE quiz_powerup_rules ADD COLUMN max_uses_per_attempt INT NULL AFTER is_enabled");
-    $hasMaxUsesPerAttempt = true;
-}
-
-$allQuizPowerups = $db->fetchAll(
-    "SELECT id, code, name, description, icon, point_cost, config
-     FROM powerups
-     WHERE type = 'quiz' AND is_active = 1
-     ORDER BY point_cost ASC"
-);
 
 // Handle POST actions
 $message = null;
@@ -110,9 +68,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
                     throw new \RuntimeException('Please provide at least one valid question.');
                 }
 
-                $powerupRules = json_decode((string) ($_POST['powerup_rules_json'] ?? '[]'), true);
-                $powerupRules = is_array($powerupRules) ? $powerupRules : [];
-
                 $db->beginTransaction();
                 $db->update('quizzes', [
                     'title' => trim($_POST['title'] ?? ''),
@@ -122,13 +77,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && verify_csrf()) {
                     'scheduled_at' => !empty($_POST['scheduled_at']) ? $_POST['scheduled_at'] : null,
                     'closes_at' => !empty($_POST['closes_at']) ? $_POST['closes_at'] : null,
                     'show_results_immediately' => isset($_POST['show_results_immediately']) ? 1 : 0,
-                    'allow_powerups' => isset($_POST['allow_powerups']) ? 1 : 0,
                     'status' => $_POST['status'] ?? 'draft',
                 ], 'id = ?', [$quizId]);
-
-                // Save per-quiz powerup policy (enabled + max usage limit)
-                $quizService = new QuizService();
-                $quizService->setQuizPowerupRules($quizId, $powerupRules);
 
                 $db->delete('quiz_questions', 'quiz_id = ?', [$quizId]);
                 $number = 1;
@@ -181,9 +131,6 @@ if ($role === 'teacher') {
 }
 
 $whereClause = implode(' AND ', $where);
-$attemptJoinCondition = $hasIsPreviewAttemptFlag
-    ? "qa.quiz_id = q.id AND qa.status = 'completed' AND COALESCE(qa.is_preview, 0) = 0"
-    : "qa.quiz_id = q.id AND qa.status = 'completed'";
 
 $quizzes = $db->fetchAll(
     "SELECT q.*, c.name as course_name,
@@ -192,7 +139,7 @@ $quizzes = $db->fetchAll(
      FROM quizzes q
      LEFT JOIN courses c ON q.course_id = c.id
      LEFT JOIN quiz_questions qq ON qq.quiz_id = q.id
-     LEFT JOIN quiz_attempts qa ON $attemptJoinCondition
+     LEFT JOIN quiz_attempts qa ON qa.quiz_id = q.id AND qa.status = 'completed'
      WHERE $whereClause
      GROUP BY q.id
      ORDER BY q.created_at DESC",
@@ -433,9 +380,6 @@ if ($editQuizId > 0) {
                                     <a href="quizzes_manage.php?edit_quiz_id=<?= $q['id'] ?>" class="btn btn-sm btn-outline-primary" title="Edit">
                                         <i class="bi bi-pencil-square"></i>
                                     </a>
-                                    <a href="quiz_attempt.php?quiz_id=<?= (int) $q['id'] ?>&preview=1" class="btn btn-sm btn-outline-info" title="Preview quiz (staff test)">
-                                        <i class="bi bi-play-circle"></i>
-                                    </a>
                                     <a href="quiz_results.php?quiz_id=<?= $q['id'] ?>" class="btn btn-sm btn-outline-secondary" title="Results">
                                         <i class="bi bi-bar-chart"></i>
                                     </a>
@@ -521,56 +465,6 @@ if ($editQuizId > 0) {
                                 </label>
                             </div>
                         </div>
-                        <div class="col-md-4">
-                            <div class="form-check mt-4 pt-1">
-                                <input class="form-check-input" type="checkbox" id="create-allow-powerups" name="allow_powerups" value="1" checked>
-                                <label class="form-check-label" for="create-allow-powerups">
-                                    Allow powerups (shop)
-                                </label>
-                            </div>
-                        </div>
-                        <div class="col-12" id="create-powerup-rules">
-                            <div class="border rounded p-3 bg-light-subtle">
-                                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                                    <div class="fw-bold">Allowed powerups for this quiz</div>
-                                    <div class="btn-group btn-group-sm">
-                                        <button type="button" class="btn btn-outline-secondary" id="btn-allow-all-powerups">Allow all</button>
-                                        <button type="button" class="btn btn-outline-secondary" id="btn-disable-exemption">Disable “Quiz Exemption”</button>
-                                    </div>
-                                </div>
-                                <div class="text-muted small mt-1">Set each powerup as allowed/banned and optionally set max uses per attempt (leave blank for no additional cap).</div>
-                                <div class="row g-2 mt-2">
-                                    <?php foreach ($allQuizPowerups as $p): ?>
-                                    <div class="col-12 col-md-6">
-                                        <div class="border rounded p-2">
-                                            <div class="fw-semibold">
-                                                <?= e(($p['icon'] ?: '✨') . ' ' . $p['name']) ?>
-                                                <span class="text-muted small">(<?= (int) $p['point_cost'] ?> pts)</span>
-                                            </div>
-                                            <div class="text-muted small mb-2"><?= e($p['code']) ?></div>
-                                            <div class="row g-2 align-items-end">
-                                                <div class="col-6">
-                                                    <label class="form-label small mb-1">Policy</label>
-                                                    <select class="form-select form-select-sm create-powerup-policy"
-                                                        data-powerup-id="<?= (int) $p['id'] ?>"
-                                                        data-powerup-code="<?= e($p['code']) ?>">
-                                                        <option value="enabled" selected>Allowed</option>
-                                                        <option value="disabled">Banned</option>
-                                                    </select>
-                                                </div>
-                                                <div class="col-6">
-                                                    <label class="form-label small mb-1">Max / attempt</label>
-                                                    <input type="number" min="1" class="form-control form-control-sm create-powerup-max"
-                                                        data-powerup-id="<?= (int) $p['id'] ?>"
-                                                        placeholder="No limit">
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <?php endforeach; ?>
-                                </div>
-                            </div>
-                        </div>
                         <div class="col-12 mt-2">
                             <div class="d-flex justify-content-between align-items-center">
                                 <label class="form-label mb-0">Questions</label>
@@ -599,7 +493,6 @@ if ($editQuizId > 0) {
                 <input type="hidden" name="action" value="update_quiz">
                 <input type="hidden" name="quiz_id" value="<?= (int) ($editingQuiz['id'] ?? 0) ?>">
                 <input type="hidden" name="questions_json" id="edit-questions-json" value="">
-                <input type="hidden" name="powerup_rules_json" id="edit-powerup-rules-json" value="">
                 <div class="modal-header">
                     <h5 class="modal-title">Edit Quiz</h5>
                     <a href="quizzes_manage.php" class="btn-close"></a>
@@ -634,74 +527,6 @@ if ($editQuizId > 0) {
                                 <option value="<?= $s ?>" <?= (($editingQuiz['status'] ?? '') === $s) ? 'selected' : '' ?>><?= ucfirst($s) ?></option>
                                 <?php endforeach; ?>
                             </select>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="form-check mt-4 pt-1">
-                                <input class="form-check-input" type="checkbox" id="edit-allow-powerups" name="allow_powerups" value="1" <?= !empty($editingQuiz['allow_powerups']) ? 'checked' : '' ?>>
-                                <label class="form-check-label" for="edit-allow-powerups">
-                                    Allow powerups (shop)
-                                </label>
-                            </div>
-                        </div>
-                        <div class="col-12" id="edit-powerup-rules">
-                            <?php
-                                $editingPowerupRulesMap = [];
-                                if (!empty($editingQuiz['id'])) {
-                                    $rows = $db->fetchAll("SELECT powerup_id, is_enabled, max_uses_per_attempt FROM quiz_powerup_rules WHERE quiz_id = ?", [(int) $editingQuiz['id']]);
-                                    foreach ($rows as $r) {
-                                        $editingPowerupRulesMap[(int) $r['powerup_id']] = [
-                                            'is_enabled' => (int) $r['is_enabled'] === 1,
-                                            'max_uses_per_attempt' => isset($r['max_uses_per_attempt']) ? (int) $r['max_uses_per_attempt'] : null,
-                                        ];
-                                    }
-                                }
-                            ?>
-                            <div class="border rounded p-3 bg-light-subtle">
-                                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                                    <div class="fw-bold">Allowed powerups for this quiz</div>
-                                    <div class="btn-group btn-group-sm">
-                                        <button type="button" class="btn btn-outline-secondary" id="btn-edit-allow-all-powerups">Allow all</button>
-                                        <button type="button" class="btn btn-outline-secondary" id="btn-edit-disable-exemption">Disable “Quiz Exemption”</button>
-                                    </div>
-                                </div>
-                                <div class="text-muted small mt-1">Set each powerup as allowed/banned and optionally set max uses per attempt (leave blank for no additional cap).</div>
-                                <div class="row g-2 mt-2">
-                                    <?php foreach ($allQuizPowerups as $p): ?>
-                                    <?php
-                                        $rule = $editingPowerupRulesMap[(int) $p['id']] ?? ['is_enabled' => true, 'max_uses_per_attempt' => null];
-                                        $isEnabled = !empty($rule['is_enabled']);
-                                        $maxUses = isset($rule['max_uses_per_attempt']) && (int) $rule['max_uses_per_attempt'] > 0 ? (int) $rule['max_uses_per_attempt'] : '';
-                                    ?>
-                                    <div class="col-12 col-md-6">
-                                        <div class="border rounded p-2">
-                                            <div class="fw-semibold">
-                                                <?= e(($p['icon'] ?: '✨') . ' ' . $p['name']) ?>
-                                                <span class="text-muted small">(<?= (int) $p['point_cost'] ?> pts)</span>
-                                            </div>
-                                            <div class="text-muted small mb-2"><?= e($p['code']) ?></div>
-                                            <div class="row g-2 align-items-end">
-                                                <div class="col-6">
-                                                    <label class="form-label small mb-1">Policy</label>
-                                                    <select class="form-select form-select-sm edit-powerup-policy"
-                                                        data-powerup-id="<?= (int) $p['id'] ?>"
-                                                        data-powerup-code="<?= e($p['code']) ?>">
-                                                        <option value="enabled" <?= $isEnabled ? 'selected' : '' ?>>Allowed</option>
-                                                        <option value="disabled" <?= $isEnabled ? '' : 'selected' ?>>Banned</option>
-                                                    </select>
-                                                </div>
-                                                <div class="col-6">
-                                                    <label class="form-label small mb-1">Max / attempt</label>
-                                                    <input type="number" min="1" class="form-control form-control-sm edit-powerup-max"
-                                                        data-powerup-id="<?= (int) $p['id'] ?>"
-                                                        placeholder="No limit"
-                                                        value="<?= e((string) $maxUses) ?>">
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <?php endforeach; ?>
-                                </div>
-                            </div>
                         </div>
                         <div class="col-md-8">
                             <div class="form-check mt-4 pt-1">
@@ -846,27 +671,11 @@ if ($editQuizId > 0) {
                 shuffle_questions: 0,
                 shuffle_answers: 1,
                 show_live_leaderboard: 1,
-                allow_powerups: form.allow_powerups?.checked ? 1 : 0,
+                allow_powerups: 1,
                 show_results_immediately: form.show_results_immediately?.checked ? 1 : 0,
                 publish: form.status.value === 'active',
-                powerup_rules: [],
                 questions: []
             };
-
-            const policyRows = [...document.querySelectorAll('.create-powerup-policy')];
-            if (policyRows.length > 0) {
-                for (const policy of policyRows) {
-                    const pid = parseInt(policy.getAttribute('data-powerup-id') || '0', 10);
-                    if (pid <= 0) continue;
-                    const maxInput = document.querySelector(`.create-powerup-max[data-powerup-id="${pid}"]`);
-                    const maxValue = parseInt((maxInput && maxInput.value) ? maxInput.value : '0', 10);
-                    payload.powerup_rules.push({
-                        powerup_id: pid,
-                        is_enabled: payload.allow_powerups ? (policy.value !== 'disabled' ? 1 : 0) : 0,
-                        max_uses_per_attempt: Number.isFinite(maxValue) && maxValue > 0 ? maxValue : null
-                    });
-                }
-            }
 
             for (const card of questionList.children) {
                 const type = card.querySelector('.question-type').value;
@@ -1041,70 +850,8 @@ if ($editQuizId > 0) {
                     return;
                 }
                 editQuestionsInput.value = JSON.stringify(questions);
-
-                const rules = [];
-                const policies = [...document.querySelectorAll('.edit-powerup-policy')];
-                for (const policy of policies) {
-                    const pid = parseInt(policy.getAttribute('data-powerup-id') || '0', 10);
-                    if (pid <= 0) continue;
-                    const maxInput = document.querySelector(`.edit-powerup-max[data-powerup-id="${pid}"]`);
-                    const maxValue = parseInt((maxInput && maxInput.value) ? maxInput.value : '0', 10);
-                    rules.push({
-                        powerup_id: pid,
-                        is_enabled: editAllowPowerupsToggle && !editAllowPowerupsToggle.checked ? 0 : (policy.value !== 'disabled' ? 1 : 0),
-                        max_uses_per_attempt: Number.isFinite(maxValue) && maxValue > 0 ? maxValue : null
-                    });
-                }
-                const rulesInput = document.getElementById('edit-powerup-rules-json');
-                if (rulesInput) rulesInput.value = JSON.stringify(rules);
             });
         }
-
-        // Create modal quick buttons + visibility
-        const allowPowerupsToggle = document.getElementById('create-allow-powerups');
-        const createRules = document.getElementById('create-powerup-rules');
-        function syncCreateRulesVisibility() {
-            if (!createRules || !allowPowerupsToggle) return;
-            createRules.style.display = allowPowerupsToggle.checked ? '' : 'none';
-        }
-        if (allowPowerupsToggle) {
-            allowPowerupsToggle.addEventListener('change', syncCreateRulesVisibility);
-            syncCreateRulesVisibility();
-        }
-        const allowAllBtn = document.getElementById('btn-allow-all-powerups');
-        const disableExBtn = document.getElementById('btn-disable-exemption');
-        if (allowAllBtn) allowAllBtn.addEventListener('click', () => {
-            document.querySelectorAll('.create-powerup-policy').forEach(sel => sel.value = 'enabled');
-            document.querySelectorAll('.create-powerup-max').forEach(inp => inp.value = '');
-        });
-        if (disableExBtn) disableExBtn.addEventListener('click', () => {
-            document.querySelectorAll('.create-powerup-policy').forEach(sel => {
-                if ((sel.getAttribute('data-powerup-code') || '') === 'quiz_exemption') sel.value = 'disabled';
-            });
-        });
-
-        // Edit modal quick buttons + visibility
-        const editAllowPowerupsToggle = document.getElementById('edit-allow-powerups');
-        const editRules = document.getElementById('edit-powerup-rules');
-        function syncEditRulesVisibility() {
-            if (!editRules || !editAllowPowerupsToggle) return;
-            editRules.style.display = editAllowPowerupsToggle.checked ? '' : 'none';
-        }
-        if (editAllowPowerupsToggle) {
-            editAllowPowerupsToggle.addEventListener('change', syncEditRulesVisibility);
-            syncEditRulesVisibility();
-        }
-        const editAllowAllBtn = document.getElementById('btn-edit-allow-all-powerups');
-        const editDisableExBtn = document.getElementById('btn-edit-disable-exemption');
-        if (editAllowAllBtn) editAllowAllBtn.addEventListener('click', () => {
-            document.querySelectorAll('.edit-powerup-policy').forEach(sel => sel.value = 'enabled');
-            document.querySelectorAll('.edit-powerup-max').forEach(inp => inp.value = '');
-        });
-        if (editDisableExBtn) editDisableExBtn.addEventListener('click', () => {
-            document.querySelectorAll('.edit-powerup-policy').forEach(sel => {
-                if ((sel.getAttribute('data-powerup-code') || '') === 'quiz_exemption') sel.value = 'disabled';
-            });
-        });
     })();
 
     <?php if ($editingQuiz): ?>

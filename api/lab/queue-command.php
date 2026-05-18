@@ -8,14 +8,11 @@
 require_once __DIR__ . '/../../lib/Database.php';
 require_once __DIR__ . '/../../lib/Auth.php';
 require_once __DIR__ . '/../../lib/Csrf.php';
-require_once __DIR__ . '/../../lib/autoload.php';
 require_once __DIR__ . '/../../services/PCService.php';
-require_once __DIR__ . '/../../services/AdminLogService.php';
 require_once __DIR__ . '/../middleware/CorsMiddleware.php';
 
 use XPLabs\Lib\Auth;
 use XPLabs\Lib\Csrf;
-use XPLabs\Services\AdminLogService;
 use XPLabs\Services\PCService;
 use XPLabs\Api\Middleware\CorsMiddleware;
 
@@ -35,9 +32,6 @@ $input = json_decode(file_get_contents('php://input'), true) ?? [];
 $pcId = $input['pc_id'] ?? null;
 $commandType = $input['command_type'] ?? '';
 $issuedBy = (int) (Auth::id() ?? 0);
-if ($issuedBy <= 0 && !empty($input['issued_by'])) {
-    $issuedBy = (int) $input['issued_by'];
-}
 $params = $input['params'] ?? null;
 
 if (!$commandType) {
@@ -54,12 +48,6 @@ if (!in_array($commandType, $allowedCommands)) {
 }
 
 $pcService = new PCService();
-$issuedBy = $pcService->resolveIssuedByUserId($issuedBy);
-if ($issuedBy <= 0) {
-    http_response_code(500);
-    echo json_encode(['error' => 'No valid instructor/admin user for issued_by']);
-    exit;
-}
 $commandsSent = 0;
 
 if ($pcId === 'all') {
@@ -90,14 +78,6 @@ if ($pcId === 'all') {
     $result = $pcService->queueCommand($pcId, $issuedBy, $commandType, $params);
     
     if ($result['success']) {
-        try {
-            (new AdminLogService())->log('pc_command', 'lab_pc', $pcId, [
-                'command_type' => $commandType,
-                'command_id' => $result['command_id'] ?? null,
-            ], $issuedBy);
-        } catch (\Throwable $e) {
-            error_log('queue-command audit log failed: ' . $e->getMessage());
-        }
         echo json_encode([
             'success' => true,
             'message' => 'Command queued',

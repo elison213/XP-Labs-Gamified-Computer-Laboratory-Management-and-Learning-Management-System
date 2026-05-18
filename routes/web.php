@@ -80,3 +80,4 @@ $router->get('/admin/logs', [AdminController::class, 'logs']);
 $router->get('/admin/analytics', [AdminController::class, 'analytics']);
 $router->get('/admin/award-points', [AdminController::class, 'awardPoints']);
 $router->get('/admin/incidents', [AdminController::class, 'incidents']);
+$router->get('/admin/inventory', [AdminController::class, 'inventory']);
